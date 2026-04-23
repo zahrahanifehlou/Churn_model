@@ -93,6 +93,7 @@ Churn_model/
 | CI/CD | [GitHub Actions](https://github.com/features/actions) | Automated test → build → deploy |
 | Cloud Compute | [AWS ECS Fargate](https://aws.amazon.com/fargate/) | Serverless container hosting |
 | Load Balancing | [AWS ALB](https://aws.amazon.com/elasticloadbalancing/) | Route and distribute inference traffic |
+| Streamlit | [Streamlit](https://streamlit.io/) | Web application for model exploration |
 
 ---
 
