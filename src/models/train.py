@@ -42,6 +42,8 @@ def train_model(df: pd.DataFrame, target_col: str):
         mlflow.log_metric("accuracy", acc)
         mlflow.log_metric("recall", rec)
         mlflow.xgboost.log_model(model, "model")
+        
+
 
         # 🔑 Log dataset so it shows in MLflow UI
         train_ds = mlflow.data.from_pandas(df, source="training_data")
