@@ -1,4 +1,4 @@
-# Telco Customer Churn — End-to-End MLOps Pipeline
+# 🔁 ML End-to-End Flow
 
 > **First project in the End-to-End MLOps series.**  
 > The goal is to go beyond notebooks and build a production-grade ML pipeline covering data quality, training, serving, containerisation, CI/CD, deployment, and monitoring.
