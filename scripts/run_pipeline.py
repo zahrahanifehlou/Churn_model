@@ -237,5 +237,5 @@ if __name__ == "__main__":
 """
 # Use this below to run the pipeline:
 
-python scripts/run_pipeline.py --input data/raw/WA_Fn-UseC_-Telco-Customer-Churn.csv --target Churn
+python scripts/run_pipeline.py --input data/raw/WA_Fn-UseC_-Telco-Customer-Churn.csv --target Churn --threshold 0.5
 """
