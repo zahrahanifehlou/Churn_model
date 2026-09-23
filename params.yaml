@@ -1,0 +1,11 @@
+preprocess:
+  raw_path: data/raw/churn.csv
+  output_path: data/processed/churn_processed.csv
+  target_col: Churn
+
+  # Example parameters 
+  missing_strategy: median          # or "drop", "knn", etc.
+  scale_numeric: true
+  scaler_type: standard             # standard / robust / minmax
+  remove_outliers: false
+  # add more as needed
