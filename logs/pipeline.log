@@ -1,0 +1,79 @@
+2026-09-24 15:31:15,791 | INFO | Starting preprocessing pipeline
+2026-09-24 15:31:15,791 | INFO | Loading data: /home/zahra/Churn_model/data/raw/churn.csv
+2026-09-24 15:31:15,812 | INFO | Raw data shape: (7043, 21)
+2026-09-24 15:31:15,813 | INFO | Preprocessing data
+2026-09-24 15:31:15,826 | INFO | Validating target: Churn
+2026-09-24 15:31:15,827 | INFO | Building features
+2026-09-24 15:31:15,972 | INFO | Processed data saved: /home/zahra/Churn_model/data/processed/churn_processed.csv
+2026-09-24 15:31:15,972 | INFO | Final data shape: (7043, 31)
+2026-09-24 15:31:15,973 | INFO | Pipeline completed successfully
+2026-09-24 16:54:30,899 | INFO | ======================================================================
+2026-09-24 16:54:30,900 | INFO | PHASE 2: XGBOOST MODELING
+2026-09-24 16:54:30,900 | INFO | ======================================================================
+2026-09-24 16:54:30,900 | INFO | Loading processed dataset: /home/zahra/Churn_model/data/processed/churn_processed.csv
+2026-09-24 16:54:30,921 | INFO | Dataset shape: (7043, 31)
+2026-09-24 16:54:30,922 | INFO | Target 'Churn' validated.
+2026-09-24 16:54:30,922 | INFO | Target distribution:
+Churn
+0    5174
+1    1869
+Name: count, dtype: int64
+2026-09-24 16:54:30,924 | INFO | Features: 30
+2026-09-24 16:54:30,924 | INFO | Samples: 7043
+2026-09-24 16:54:30,928 | INFO | Training shape: (5634, 30)
+2026-09-24 16:54:30,928 | INFO | Test shape: (1409, 30)
+2026-09-24 16:54:30,928 | INFO | Negative samples: 4139
+2026-09-24 16:54:30,928 | INFO | Positive samples: 1495
+2026-09-24 16:54:30,928 | INFO | scale_pos_weight: 2.7686
+2026-09-24 16:54:30,929 | INFO | Starting Optuna optimization.
+2026-09-24 16:54:30,929 | INFO | Number of trials: 30
+2026-09-24 16:54:30,929 | INFO | Optimization metric: recall
+2026-09-24 16:54:31,731 | INFO | Trial 0 | recall=0.8396
+2026-09-24 16:54:32,099 | INFO | Trial 1 | recall=0.8503
+2026-09-24 16:54:32,480 | INFO | Trial 2 | recall=0.8316
+2026-09-24 16:54:33,167 | INFO | Trial 3 | recall=0.8316
+2026-09-24 16:54:33,559 | INFO | Trial 4 | recall=0.8422
+2026-09-24 16:54:34,179 | INFO | Trial 5 | recall=0.8262
+2026-09-24 16:54:35,172 | INFO | Trial 6 | recall=0.8316
+2026-09-24 16:54:35,687 | INFO | Trial 7 | recall=0.8556
+2026-09-24 16:54:37,063 | INFO | Trial 8 | recall=0.7727
+2026-09-24 16:54:37,695 | INFO | Trial 9 | recall=0.8396
+2026-09-24 16:54:38,223 | INFO | Trial 10 | recall=0.8449
+2026-09-24 16:54:38,724 | INFO | Trial 11 | recall=0.8529
+2026-09-24 16:54:39,251 | INFO | Trial 12 | recall=0.8449
+2026-09-24 16:54:39,799 | INFO | Trial 13 | recall=0.8369
+2026-09-24 16:54:40,344 | INFO | Trial 14 | recall=0.8583
+2026-09-24 16:54:41,376 | INFO | Trial 15 | recall=0.8610
+2026-09-24 16:54:42,167 | INFO | Trial 16 | recall=0.8610
+2026-09-24 16:54:42,833 | INFO | Trial 17 | recall=0.8610
+2026-09-24 16:54:43,959 | INFO | Trial 18 | recall=0.8476
+2026-09-24 16:54:45,172 | INFO | Trial 19 | recall=0.8289
+2026-09-24 16:54:45,837 | INFO | Trial 20 | recall=0.8449
+2026-09-24 16:54:47,599 | INFO | Trial 21 | recall=0.8610
+2026-09-24 16:54:48,084 | INFO | Trial 22 | recall=0.8583
+2026-09-24 16:54:48,541 | INFO | Trial 23 | recall=0.8610
+2026-09-24 16:54:49,132 | INFO | Trial 24 | recall=0.8663
+2026-09-24 16:54:49,537 | INFO | Trial 25 | recall=0.8449
+2026-09-24 16:54:49,943 | INFO | Trial 26 | recall=0.8556
+2026-09-24 16:54:50,754 | INFO | Trial 27 | recall=0.8583
+2026-09-24 16:54:51,792 | INFO | Trial 28 | recall=0.8422
+2026-09-24 16:54:52,942 | INFO | Trial 29 | recall=0.8422
+2026-09-24 16:54:52,944 | INFO | ======================================================================
+2026-09-24 16:54:52,944 | INFO | OPTUNA OPTIMIZATION COMPLETED
+2026-09-24 16:54:52,944 | INFO | ======================================================================
+2026-09-24 16:54:52,944 | INFO | Best trial: 24
+2026-09-24 16:54:52,944 | INFO | Best recall: 0.8663
+2026-09-24 16:54:52,945 | INFO | Best parameters: {'n_estimators': 303, 'learning_rate': 0.012599681139486467, 'max_depth': 5, 'subsample': 0.9494516825267655, 'colsample_bytree': 0.7976923315307307, 'min_child_weight': 9, 'gamma': 3.0058794014581602, 'reg_alpha': 0.6180358603288939, 'reg_lambda': 4.413867846740426}
+2026-09-24 16:54:52,945 | INFO | Training final model using best parameters.
+2026-09-24 16:54:53,375 | INFO | ======================================================================
+2026-09-24 16:54:53,375 | INFO | FINAL MODEL METRICS
+2026-09-24 16:54:53,375 | INFO | ======================================================================
+2026-09-24 16:54:53,375 | INFO | Threshold: 0.40
+2026-09-24 16:54:53,375 | INFO | Accuracy: 0.7090
+2026-09-24 16:54:53,375 | INFO | Precision: 0.4737
+2026-09-24 16:54:53,375 | INFO | Recall: 0.8663
+2026-09-24 16:54:53,375 | INFO | F1: 0.6125
+2026-09-24 16:54:53,375 | INFO | Final model parameters: {'n_estimators': 303, 'learning_rate': 0.012599681139486467, 'max_depth': 5, 'subsample': 0.9494516825267655, 'colsample_bytree': 0.7976923315307307, 'min_child_weight': 9, 'gamma': 3.0058794014581602, 'reg_alpha': 0.6180358603288939, 'reg_lambda': 4.413867846740426, 'random_state': 42, 'n_jobs': -1, 'scale_pos_weight': np.float64(2.768561872909699), 'eval_metric': 'logloss'}
+2026-09-24 16:54:53,375 | INFO | ======================================================================
+2026-09-24 16:54:53,375 | INFO | PHASE 2 COMPLETED SUCCESSFULLY
+2026-09-24 16:54:53,375 | INFO | ======================================================================

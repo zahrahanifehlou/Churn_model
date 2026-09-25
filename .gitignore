@@ -6,3 +6,5 @@
 data/processed/telco_churn_processed.csv
 notebooks/mlruns/0/meta.yaml
 /src/serving/model
+
+*.csv

@@ -1,241 +1,977 @@
 #!/usr/bin/env python3
+
 """
-Runs sequentially: load → validate → preprocess → feature engineering
+End-to-end Telco churn ML pipeline.
+
+Pipeline:
+
+    1. Load configuration
+    2. Load raw data
+    3. Validate data
+    4. Preprocess data
+    5. Build features
+    6. Save processed dataset
+    7. Train / validation / test split
+    8. Optimize XGBoost with Optuna
+    9. Train final model using best parameters
+   10. Evaluate on test set
+   11. Log experiment to MLflow
+   12. Save model artifacts
+
+Usage:
+
+    python scripts/run_pipeline.py
+
+    python scripts/run_pipeline.py --params params.yaml
 """
 
-import os
+from __future__ import annotations
+
+import argparse
+import json
+import logging
 import sys
 import time
-import argparse
-import pandas as pd
+from pathlib import Path
+
+import joblib
 import mlflow
-import mlflow.sklearn
-from posthog import project_root
-from sklearn.model_selection import train_test_split
+import mlflow.xgboost
+import optuna
+import pandas as pd
+import yaml
+
 from sklearn.metrics import (
-    classification_report, precision_score, recall_score,
-    f1_score, roc_auc_score
+    accuracy_score,
+    classification_report,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
 )
+
+from sklearn.model_selection import train_test_split
+
 from xgboost import XGBClassifier
 
-# === Fix import path for local modules ===
-# ESSENTIAL: Allows imports from src/ directory structure
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Local modules - Core pipeline components
-from src.data.load_data import load_data                    # Data loading with error handling
-from src.data.preprocess import preprocess_data            # Basic data cleaning
-from src.features.build_features import build_features     # Feature engineering (CRITICAL for model performance)
-from src.utils.validate_data import validate_telco_data    # Data quality validation
+# ============================================================================
+# PROJECT SETUP
+# ============================================================================
 
-def main(args):
-    """
-    Main training pipeline function that orchestrates the complete ML workflow.
-    
-    """
-    
-    # === MLflow Setup - ESSENTIAL for experiment tracking ===
-    # Configure MLflow to use local file-based tracking (not a tracking server)
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    mlruns_path = args.mlflow_uri or f"mlruns"  # Local file-based tracking
-    mlflow.set_tracking_uri(mlruns_path)
-    mlflow.set_experiment(args.experiment)  # Creates experiment if doesn't exist
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-    # Start MLflow run - all subsequent logging will be tracked under this run
+sys.path.insert(
+    0,
+    str(PROJECT_ROOT),
+)
+
+
+# ============================================================================
+# LOCAL MODULES
+# ============================================================================
+
+from src.data.load_data import load_data
+from src.data.preprocess import preprocess_data
+from src.features.build_features import build_features
+from src.utils.validate_data import validate_telco_data
+
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+LOG_DIR = PROJECT_ROOT / "logs"
+
+LOG_DIR.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(
+            LOG_DIR / "pipeline.log",
+            encoding="utf-8",
+        ),
+    ],
+)
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+def load_params(
+    params_path: str | Path | None = None,
+) -> dict:
+    """Load params.yaml."""
+
+    params_path = Path(
+        params_path or "params.yaml"
+    )
+
+    if not params_path.is_absolute():
+        params_path = PROJECT_ROOT / params_path
+
+    if not params_path.exists():
+        raise FileNotFoundError(
+            f"Parameters file not found: {params_path}"
+        )
+
+    with params_path.open(
+        "r",
+        encoding="utf-8",
+    ) as file:
+        return yaml.safe_load(file) or {}
+
+
+# ============================================================================
+# TARGET VALIDATION
+# ============================================================================
+
+def validate_target(
+    df: pd.DataFrame,
+    target_col: str,
+) -> pd.DataFrame:
+    """Validate and normalize target."""
+
+    if target_col not in df.columns:
+        raise ValueError(
+            f"Target column '{target_col}' not found."
+        )
+
+    if df[target_col].dtype == "object":
+
+        df[target_col] = (
+            df[target_col]
+            .astype(str)
+            .str.strip()
+            .map({
+                "No": 0,
+                "Yes": 1,
+            })
+        )
+
+    if df[target_col].isna().any():
+        raise ValueError(
+            f"Target '{target_col}' contains missing values."
+        )
+
+    if not set(
+        df[target_col].unique()
+    ).issubset({0, 1}):
+
+        raise ValueError(
+            f"Target '{target_col}' must contain only 0/1."
+        )
+
+    return df
+
+
+# ============================================================================
+# MAIN PIPELINE
+# ============================================================================
+
+def run_pipeline(
+    params_path: str | Path | None = None,
+) -> None:
+
+    # ------------------------------------------------------------------------
+    # CONFIG
+    # ------------------------------------------------------------------------
+
+    params = load_params(
+        params_path
+    )
+
+    preprocess_config = params.get(
+        "preprocess",
+        {},
+    )
+
+    modeling_config = params.get(
+        "modeling",
+        {},
+    )
+
+    optuna_config = modeling_config.get(
+        "optuna",
+        {},
+    )
+
+    xgb_config = modeling_config.get(
+        "xgboost",
+        {},
+    )
+
+    mlflow_config = params.get(
+        "mlflow",
+        {},
+    )
+
+    # ------------------------------------------------------------------------
+    # PARAMETERS
+    # ------------------------------------------------------------------------
+
+    raw_path = PROJECT_ROOT / preprocess_config.get(
+        "raw_path",
+        "data/raw/WA_Fn-UseC_-Telco-Customer-Churn.csv",
+    )
+
+    processed_path = PROJECT_ROOT / preprocess_config.get(
+        "output_path",
+        "data/processed/telco_churn_processed.csv",
+    )
+
+    target_col = modeling_config.get(
+        "target_col",
+        "Churn",
+    )
+
+    test_size = modeling_config.get(
+        "test_size",
+        0.20,
+    )
+
+    validation_size = modeling_config.get(
+        "validation_size",
+        0.20,
+    )
+
+    random_state = modeling_config.get(
+        "random_state",
+        42,
+    )
+
+    threshold = modeling_config.get(
+        "threshold",
+        0.40,
+    )
+
+    n_trials = optuna_config.get(
+        "n_trials",
+        30,
+    )
+
+    optuna_direction = optuna_config.get(
+        "direction",
+        "maximize",
+    )
+
+    experiment_name = mlflow_config.get(
+        "experiment_name",
+        "Telco Churn",
+    )
+
+    tracking_uri = mlflow_config.get(
+        "tracking_uri",
+        "mlruns",
+    )
+
+    # =========================================================================
+    # START
+    # =========================================================================
+
+    logger.info("=" * 70)
+    logger.info("TELCO CHURN — OPTUNA + XGBOOST + MLFLOW")
+    logger.info("=" * 70)
+
+    # =========================================================================
+    # MLFLOW
+    # =========================================================================
+
+    if tracking_uri.startswith(
+        ("http://", "https://", "file:")
+    ):
+        mlflow.set_tracking_uri(
+            tracking_uri
+        )
+    else:
+        mlflow.set_tracking_uri(
+            str(
+                PROJECT_ROOT / tracking_uri
+            )
+        )
+
+    mlflow.set_experiment(
+        experiment_name
+    )
+
     with mlflow.start_run():
-        # === Log hyperparameters and configuration ===
-        # REQUIRED: These parameters are essential for model reproducibility
-        mlflow.log_param("model", "xgboost")           # Model type for comparison
-        mlflow.log_param("threshold", args.threshold)   # Classification threshold (default: 0.35)
-        mlflow.log_param("test_size", args.test_size)   # Train/test split ratio
 
-        # === STAGE 1: Data Loading & Validation ===
-        print("🔄 Loading data...")
-        df = load_data(args.input)  # Load raw CSV data with error handling
-        print(f"✅ Data loaded: {df.shape[0]} rows, {df.shape[1]} columns")
+        # =====================================================================
+        # LOG CONFIGURATION
+        # =====================================================================
+
+        mlflow.log_params({
+            "model": "xgboost",
+            "target": target_col,
+            "test_size": test_size,
+            "validation_size": validation_size,
+            "random_state": random_state,
+            "threshold": threshold,
+            "optuna_n_trials": n_trials,
+            "optuna_direction": optuna_direction,
+        })
+
+        # =====================================================================
+        # 1. LOAD
+        # =====================================================================
+
+        logger.info(
+            "[1/8] Loading data..."
+        )
+
+        df = load_data(
+            str(raw_path)
+        )
+
+        logger.info(
+            "Raw shape: %s",
+            df.shape,
+        )
+
+        mlflow.log_metric(
+            "raw_rows",
+            len(df),
+        )
+
+        # =====================================================================
+        # 2. VALIDATION
+        # =====================================================================
+
+        logger.info(
+            "[2/8] Validating data..."
+        )
+
         if "TotalCharges" in df.columns:
-            df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
 
-        # === CRITICAL: Data Quality Validation ===
-        # This step is ESSENTIAL for production ML - validates data quality before training
-        print("🔍 Validating data quality with Great Expectations...")
-        is_valid, failed = validate_telco_data(df)
-        mlflow.log_metric("data_quality_pass", int(is_valid))  # Track data quality over time
+            df["TotalCharges"] = pd.to_numeric(
+                df["TotalCharges"],
+                errors="coerce",
+            )
+
+        is_valid, failed = validate_telco_data(
+            df
+        )
+
+        mlflow.log_metric(
+            "data_quality_pass",
+            int(is_valid),
+        )
 
         if not is_valid:
-            # Log validation failures for debugging
-            import json
-            mlflow.log_text(json.dumps(failed, indent=2), artifact_file="failed_expectations.json")
-            raise ValueError(f"❌ Data quality check failed. Issues: {failed}")
-        else:
-            print("✅ Data validation passed. Logged to MLflow.")
 
-        # === STAGE 2: Data Preprocessing ===
-        print("🔧 Preprocessing data...")
-        df = preprocess_data(df)  # Basic cleaning (handle missing values, fix data types)
+            mlflow.log_text(
+                json.dumps(
+                    failed,
+                    indent=2,
+                ),
+                artifact_file="failed_expectations.json",
+            )
 
-        # Save processed dataset for reproducibility and debugging
-        processed_path = os.path.join(project_root, "data", "processed", "telco_churn_processed.csv")
-        os.makedirs(os.path.dirname(processed_path), exist_ok=True)
-        df.to_csv(processed_path, index=False)
-        print(f"✅ Processed dataset saved to {processed_path} | Shape: {df.shape}")
+            raise ValueError(
+                f"Data validation failed: {failed}"
+            )
 
-        # === STAGE 3: Feature Engineering - CRITICAL for Model Performance ===
-        print("🛠️  Building features...")
-        target = args.target
-        if target not in df.columns:
-            raise ValueError(f"Target column '{target}' not found in data")
-        
-        # Apply feature engineering transformations
-        df_enc = build_features(df, target_col=target)  # Binary encoding + one-hot encoding
-        
-        # IMPORTANT: Convert boolean columns to integers for XGBoost compatibility
-        for c in df_enc.select_dtypes(include=["bool"]).columns:
-            df_enc[c] = df_enc[c].astype(int)
-        print(f"✅ Feature engineering completed: {df_enc.shape[1]} features")
+        logger.info(
+            "Data validation passed."
+        )
 
-        # === CRITICAL: Save Feature Metadata for Serving Consistency ===
-        # This ensures serving pipeline uses exact same features in exact same order
-        import json, joblib
-        artifacts_dir = os.path.join(project_root, "artifacts")
-        os.makedirs(artifacts_dir, exist_ok=True)
+        # =====================================================================
+        # 3. PREPROCESS
+        # =====================================================================
 
-        # Get feature columns (exclude target)
-        feature_cols = list(df_enc.drop(columns=[target]).columns)
-        
-        # Save locally for development serving
-        with open(os.path.join(artifacts_dir, "feature_columns.json"), "w") as f:
-            json.dump(feature_cols, f)
+        logger.info(
+            "[3/8] Preprocessing..."
+        )
 
-        # Log to MLflow for production serving
-        mlflow.log_text("\n".join(feature_cols), artifact_file="feature_columns.txt")
+        df = preprocess_data(
+            df,
+            target_col=target_col,
+            missing_strategy=preprocess_config.get(
+                "missing_strategy",
+                "median",
+            ),
+            scale_numeric=preprocess_config.get(
+                "scale_numeric",
+                True,
+            ),
+            scaler_type=preprocess_config.get(
+                "scaler_type",
+                "standard",
+            ),
+            remove_outliers=preprocess_config.get(
+                "remove_outliers",
+                False,
+            ),
+        )
 
-        # ESSENTIAL: Save preprocessing artifacts for serving pipeline
-        # These artifacts ensure training and serving use identical transformations
+        processed_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        df.to_csv(
+            processed_path,
+            index=False,
+        )
+
+        if mlflow_config.get(
+            "log_processed_data",
+            True,
+        ):
+
+            mlflow.log_artifact(
+                str(processed_path),
+                artifact_path="data",
+            )
+
+        logger.info(
+            "Processed shape: %s",
+            df.shape,
+        )
+
+        # =====================================================================
+        # 4. FEATURE ENGINEERING
+        # =====================================================================
+
+        logger.info(
+            "[4/8] Building features..."
+        )
+
+        df = validate_target(
+            df,
+            target_col,
+        )
+
+        df = build_features(
+            df,
+            target_col=target_col,
+        )
+
+        # Boolean → integer
+        for column in df.select_dtypes(
+            include=["bool"]
+        ).columns:
+
+            df[column] = (
+                df[column]
+                .astype(int)
+            )
+
+        feature_columns = list(
+            df.drop(
+                columns=[target_col]
+            ).columns
+        )
+
+        logger.info(
+            "Number of features: %d",
+            len(feature_columns),
+        )
+
+        # =====================================================================
+        # SAVE PREPROCESSING ARTIFACT
+        # =====================================================================
+
+        artifacts_dir = (
+            PROJECT_ROOT / "artifacts"
+        )
+
+        artifacts_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
         preprocessing_artifact = {
-            "feature_columns": feature_cols,  # Exact feature order
-            "target": target                  # Target column name
+            "feature_columns": feature_columns,
+            "target": target_col,
         }
-        joblib.dump(preprocessing_artifact, os.path.join(artifacts_dir, "preprocessing.pkl"))
-        mlflow.log_artifact(os.path.join(artifacts_dir, "preprocessing.pkl"))
-        print(f"✅ Saved {len(feature_cols)} feature columns for serving consistency")
 
-        # === STAGE 4: Train/Test Split ===
-        print("📊 Splitting data...")
-        X = df_enc.drop(columns=[target])  # Feature matrix
-        y = df_enc[target]                 # Target vector
-        
-        # Stratified split to maintain class distribution in both sets
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, 
-            test_size=args.test_size,    # Default: 20% for testing
-            stratify=y,                  # Maintain class balance
-            random_state=42              # Reproducible splits
-        )
-        print(f"✅ Train: {X_train.shape[0]} samples | Test: {X_test.shape[0]} samples")
-
-        # === CRITICAL: Handle Class Imbalance ===
-        # Calculate scale_pos_weight to handle imbalanced dataset
-        # This tells XGBoost to give more weight to the minority class (churners)
-        scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
-        print(f"📈 Class imbalance ratio: {scale_pos_weight:.2f} (applied to positive class)")
-
-        # === STAGE 5: Model Training with Optimized Hyperparameters ===
-        print("🤖 Training XGBoost model...")
-        
-        # IMPORTANT: These hyperparameters were optimized through hyperparameter tuning
-        # In production, consider using hyperparameter optimization tools like Optuna
-        model = XGBClassifier(
-            # Tree structure parameters
-            n_estimators=301,        # Number of trees (OPTIMIZED)
-            learning_rate=0.034,     # Step size shrinkage (OPTIMIZED)  
-            max_depth=7,            # Maximum tree depth (OPTIMIZED)
-            
-            # Regularization parameters
-            subsample=0.95,         # Sample ratio of training instances
-            colsample_bytree=0.98,  # Sample ratio of features for each tree
-            
-            # Performance parameters
-            n_jobs=-1,              # Use all CPU cores
-            random_state=42,        # Reproducible results
-            eval_metric="logloss",  # Evaluation metric
-            
-            # ESSENTIAL: Handle class imbalance
-            scale_pos_weight=scale_pos_weight  # Weight for positive class (churners)
+        preprocessing_path = (
+            artifacts_dir
+            / "preprocessing.pkl"
         )
 
-        # === Train Model and Track Training Time ===
-        t0 = time.time()
-        model.fit(X_train, y_train)
-        train_time = time.time() - t0
-        mlflow.log_metric("train_time", train_time)  # Track training performance
-        print(f"✅ Model trained in {train_time:.2f} seconds")
-
-        # === STAGE 6: Model Evaluation ===
-        print("📊 Evaluating model performance...")
-        
-        # Generate predictions and track inference time
-        t1 = time.time()
-        proba = model.predict_proba(X_test)[:, 1]  # Get probability of churn (class 1)
-        
-        # Apply classification threshold (default: 0.35, optimized for churn detection)
-        # Lower threshold = more sensitive to churn (higher recall, lower precision)
-        y_pred = (proba >= args.threshold).astype(int)
-        pred_time = time.time() - t1
-        mlflow.log_metric("pred_time", pred_time)  # Track inference performance
-
-        # === CRITICAL: Log Evaluation Metrics to MLflow ===
-        # These metrics are essential for model comparison and monitoring
-        precision = precision_score(y_test, y_pred)    # Of predicted churners, how many actually churned?
-        recall = recall_score(y_test, y_pred)          # Of actual churners, how many did we catch?
-        f1 = f1_score(y_test, y_pred)                  # Harmonic mean of precision and recall
-        roc_auc = roc_auc_score(y_test, proba)         # Area under ROC curve (threshold-independent)
-        
-        # Log all metrics for experiment tracking
-        mlflow.log_metric("precision", precision)
-        mlflow.log_metric("recall", recall) 
-        mlflow.log_metric("f1", f1)
-        mlflow.log_metric("roc_auc", roc_auc)
-        
-        print(f"🎯 Model Performance:")
-        print(f"   Precision: {precision:.3f} | Recall: {recall:.3f}")
-        print(f"   F1 Score: {f1:.3f} | ROC AUC: {roc_auc:.3f}")
-
-        # === STAGE 7: Model Serialization and Logging ===
-        print("💾 Saving model to MLflow...")
-        # ESSENTIAL: Log model in MLflow's standard format for serving
-        mlflow.sklearn.log_model(
-            model, 
-            artifact_path="model"  # This creates a 'model/' folder in MLflow run artifacts
+        joblib.dump(
+            preprocessing_artifact,
+            preprocessing_path,
         )
-        print("✅ Model saved to MLflow for serving pipeline")
 
-        # === Final Performance Summary ===
-        print(f"\n⏱️  Performance Summary:")
-        print(f"   Training time: {train_time:.2f}s")
-        print(f"   Inference time: {pred_time:.4f}s")
-        print(f"   Samples per second: {len(X_test)/pred_time:.0f}")
-        
-        print(f"\n📈 Detailed Classification Report:")
-        print(classification_report(y_test, y_pred, digits=3))
+        mlflow.log_artifact(
+            str(preprocessing_path),
+            artifact_path="preprocessing",
+        )
 
+        mlflow.log_text(
+            "\n".join(feature_columns),
+            artifact_file="feature_columns.txt",
+        )
+
+        # =====================================================================
+        # 5. TRAIN / VALIDATION / TEST SPLIT
+        # =====================================================================
+
+        logger.info(
+            "[5/8] Splitting data..."
+        )
+
+        X = df.drop(
+            columns=[target_col]
+        )
+
+        y = df[target_col]
+
+        # First split:
+        # train+validation / test
+        X_train_val, X_test, y_train_val, y_test = (
+            train_test_split(
+                X,
+                y,
+                test_size=test_size,
+                stratify=y,
+                random_state=random_state,
+            )
+        )
+
+        # Second split:
+        # train / validation
+        validation_ratio = (
+            validation_size
+            / (1 - test_size)
+        )
+
+        X_train, X_val, y_train, y_val = (
+            train_test_split(
+                X_train_val,
+                y_train_val,
+                test_size=validation_ratio,
+                stratify=y_train_val,
+                random_state=random_state,
+            )
+        )
+
+        logger.info(
+            "Train: %d",
+            len(X_train),
+        )
+
+        logger.info(
+            "Validation: %d",
+            len(X_val),
+        )
+
+        logger.info(
+            "Test: %d",
+            len(X_test),
+        )
+
+        mlflow.log_metrics({
+            "train_samples": len(X_train),
+            "validation_samples": len(X_val),
+            "test_samples": len(X_test),
+        })
+
+        # =====================================================================
+        # CLASS IMBALANCE
+        # =====================================================================
+
+        negative_count = (
+            y_train == 0
+        ).sum()
+
+        positive_count = (
+            y_train == 1
+        ).sum()
+
+        if positive_count == 0:
+
+            raise ValueError(
+                "Training set contains no positive samples."
+            )
+
+        scale_pos_weight = (
+            negative_count
+            / positive_count
+        )
+
+        mlflow.log_metric(
+            "scale_pos_weight",
+            scale_pos_weight,
+        )
+
+        logger.info(
+            "scale_pos_weight: %.4f",
+            scale_pos_weight,
+        )
+
+        # =====================================================================
+        # 6. OPTUNA
+        # =====================================================================
+
+        logger.info(
+            "[6/8] Starting Optuna optimization..."
+        )
+
+        def objective(
+            trial: optuna.Trial,
+        ) -> float:
+
+            params = {
+                "n_estimators": trial.suggest_int(
+                    "n_estimators",
+                    xgb_config["n_estimators"]["min"],
+                    xgb_config["n_estimators"]["max"],
+                ),
+
+                "learning_rate": trial.suggest_float(
+                    "learning_rate",
+                    xgb_config["learning_rate"]["min"],
+                    xgb_config["learning_rate"]["max"],
+                ),
+
+                "max_depth": trial.suggest_int(
+                    "max_depth",
+                    xgb_config["max_depth"]["min"],
+                    xgb_config["max_depth"]["max"],
+                ),
+
+                "subsample": trial.suggest_float(
+                    "subsample",
+                    xgb_config["subsample"]["min"],
+                    xgb_config["subsample"]["max"],
+                ),
+
+                "colsample_bytree": trial.suggest_float(
+                    "colsample_bytree",
+                    xgb_config["colsample_bytree"]["min"],
+                    xgb_config["colsample_bytree"]["max"],
+                ),
+
+                "min_child_weight": trial.suggest_int(
+                    "min_child_weight",
+                    xgb_config["min_child_weight"]["min"],
+                    xgb_config["min_child_weight"]["max"],
+                ),
+
+                "gamma": trial.suggest_float(
+                    "gamma",
+                    xgb_config["gamma"]["min"],
+                    xgb_config["gamma"]["max"],
+                ),
+
+                "reg_alpha": trial.suggest_float(
+                    "reg_alpha",
+                    xgb_config["reg_alpha"]["min"],
+                    xgb_config["reg_alpha"]["max"],
+                ),
+
+                "reg_lambda": trial.suggest_float(
+                    "reg_lambda",
+                    xgb_config["reg_lambda"]["min"],
+                    xgb_config["reg_lambda"]["max"],
+                ),
+
+                "random_state": random_state,
+
+                "n_jobs": xgb_config.get(
+                    "n_jobs",
+                    -1,
+                ),
+
+                "scale_pos_weight": scale_pos_weight,
+
+                "eval_metric": xgb_config.get(
+                    "eval_metric",
+                    "logloss",
+                ),
+            }
+
+            model = XGBClassifier(
+                **params
+            )
+
+            model.fit(
+                X_train,
+                y_train,
+            )
+
+            probabilities = model.predict_proba(
+                X_val
+            )[:, 1]
+
+            predictions = (
+                probabilities >= threshold
+            ).astype(int)
+
+            recall = recall_score(
+                y_val,
+                predictions,
+                zero_division=0,
+            )
+
+            logger.info(
+                "Trial %d | Recall: %.4f",
+                trial.number,
+                recall,
+            )
+
+            return recall
+
+        study = optuna.create_study(
+            direction=optuna_direction,
+        )
+
+        study.optimize(
+            objective,
+            n_trials=n_trials,
+        )
+
+        # =====================================================================
+        # BEST OPTUNA RESULT
+        # =====================================================================
+
+        logger.info(
+            "Optuna optimization completed."
+        )
+
+        logger.info(
+            "Best trial: %d",
+            study.best_trial.number,
+        )
+
+        logger.info(
+            "Best validation recall: %.4f",
+            study.best_value,
+        )
+
+        logger.info(
+            "Best parameters: %s",
+            study.best_params,
+        )
+
+        mlflow.log_metric(
+            "best_validation_recall",
+            study.best_value,
+        )
+
+        mlflow.log_params({
+            f"best_{key}": value
+            for key, value
+            in study.best_params.items()
+        })
+
+        # =====================================================================
+        # 7. FINAL MODEL
+        # =====================================================================
+
+        logger.info(
+            "[7/8] Training final model..."
+        )
+
+        final_params = {
+            **study.best_params,
+
+            "random_state": random_state,
+
+            "n_jobs": xgb_config.get(
+                "n_jobs",
+                -1,
+            ),
+
+            "scale_pos_weight": scale_pos_weight,
+
+            "eval_metric": xgb_config.get(
+                "eval_metric",
+                "logloss",
+            ),
+        }
+
+        final_model = XGBClassifier(
+            **final_params
+        )
+
+        train_start = time.time()
+
+        # Train using train + validation data
+        final_model.fit(
+            X_train_val,
+            y_train_val,
+        )
+
+        train_time = (
+            time.time()
+            - train_start
+        )
+
+        mlflow.log_metric(
+            "final_train_time_seconds",
+            train_time,
+        )
+
+        # =====================================================================
+        # 8. FINAL TEST EVALUATION
+        # =====================================================================
+
+        logger.info(
+            "[8/8] Evaluating final model on TEST set..."
+        )
+
+        prediction_start = time.time()
+
+        test_proba = final_model.predict_proba(
+            X_test
+        )[:, 1]
+
+        test_pred = (
+            test_proba >= threshold
+        ).astype(int)
+
+        prediction_time = (
+            time.time()
+            - prediction_start
+        )
+
+        accuracy = accuracy_score(
+            y_test,
+            test_pred,
+        )
+
+        precision = precision_score(
+            y_test,
+            test_pred,
+            zero_division=0,
+        )
+
+        recall = recall_score(
+            y_test,
+            test_pred,
+            zero_division=0,
+        )
+
+        f1 = f1_score(
+            y_test,
+            test_pred,
+            zero_division=0,
+        )
+
+        roc_auc = roc_auc_score(
+            y_test,
+            test_proba,
+        )
+
+        mlflow.log_metrics({
+            "test_accuracy": accuracy,
+            "test_precision": precision,
+            "test_recall": recall,
+            "test_f1": f1,
+            "test_roc_auc": roc_auc,
+            "prediction_time_seconds": prediction_time,
+        })
+
+        report = classification_report(
+            y_test,
+            test_pred,
+            digits=3,
+        )
+
+        mlflow.log_text(
+            report,
+            artifact_file="classification_report.txt",
+        )
+
+        # =====================================================================
+        # LOG FINAL MODEL
+        # =====================================================================
+
+        logger.info(
+            "Logging final model to MLflow..."
+        )
+
+        mlflow.xgboost.log_model(
+            final_model,
+            artifact_path="model",
+        )
+
+        # =====================================================================
+        # SUMMARY
+        # =====================================================================
+
+        logger.info("=" * 70)
+        logger.info(
+            "PIPELINE COMPLETED SUCCESSFULLY"
+        )
+        logger.info("=" * 70)
+
+        logger.info(
+            "Best validation recall: %.4f",
+            study.best_value,
+        )
+
+        logger.info(
+            "Test Accuracy: %.4f",
+            accuracy,
+        )
+
+        logger.info(
+            "Test Precision: %.4f",
+            precision,
+        )
+
+        logger.info(
+            "Test Recall: %.4f",
+            recall,
+        )
+
+        logger.info(
+            "Test F1: %.4f",
+            f1,
+        )
+
+        logger.info(
+            "Test ROC AUC: %.4f",
+            roc_auc,
+        )
+
+        logger.info(
+            "\nClassification Report:\n%s",
+            report,
+        )
+
+        logger.info(
+            "MLflow Run ID: %s",
+            mlflow.active_run().info.run_id,
+        )
+
+
+# ============================================================================
+# CLI
+# ============================================================================
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="Run churn pipeline with XGBoost + MLflow")
-    p.add_argument("--input", type=str, required=True,
-                   help="path to CSV (e.g., data/raw/Telco-Customer-Churn.csv)")
-    p.add_argument("--target", type=str, default="Churn")
-    p.add_argument("--threshold", type=float, default=0.35)
-    p.add_argument("--test_size", type=float, default=0.2)
-    p.add_argument("--experiment", type=str, default="Telco Churn")
-    p.add_argument("--mlflow_uri", type=str, default=None,
-                    help="override MLflow tracking URI, else uses project_root/mlruns")
 
-    args = p.parse_args()
-    main(args)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run Telco churn "
+            "XGBoost + Optuna + MLflow pipeline."
+        )
+    )
 
-"""
-# Use this below to run the pipeline:
+    parser.add_argument(
+        "--params",
+        default=None,
+        help="Path to params.yaml",
+    )
 
-python scripts/run_pipeline.py --input data/raw/WA_Fn-UseC_-Telco-Customer-Churn.csv --target Churn --threshold 0.5
-"""
+    args = parser.parse_args()
+
+    run_pipeline(
+        args.params
+    )

@@ -1,11 +1,80 @@
 preprocess:
-  raw_path: data/raw/churn.csv
-  output_path: data/processed/churn_processed.csv
-  target_col: Churn
+  raw_path: "data/raw/churn.csv"
+  output_path: "data/processed/churn_processed.csv"
 
-  # Example parameters 
-  missing_strategy: median          # or "drop", "knn", etc.
+  target_col: "Churn"
+
+  missing_strategy: "median"
   scale_numeric: true
-  scaler_type: standard             # standard / robust / minmax
+  scaler_type: "standard"
   remove_outliers: false
-  # add more as needed
+
+
+modeling:
+  data_path: "data/processed/churn_processed.csv"
+  target_col: "Churn"
+
+  test_size: 0.20
+  validation_size: 0.20
+
+  random_state: 42
+  stratify: true
+
+  threshold: 0.40
+
+  optuna:
+    n_trials: 30
+    direction: "maximize"
+    metric: "recall"
+
+    n_jobs: 1
+
+  xgboost:
+    n_estimators:
+      min: 300
+      max: 800
+
+    learning_rate:
+      min: 0.01
+      max: 0.20
+
+    max_depth:
+      min: 3
+      max: 10
+
+    subsample:
+      min: 0.50
+      max: 1.00
+
+    colsample_bytree:
+      min: 0.50
+      max: 1.00
+
+    min_child_weight:
+      min: 1
+      max: 10
+
+    gamma:
+      min: 0.0
+      max: 5.0
+
+    reg_alpha:
+      min: 0.0
+      max: 5.0
+
+    reg_lambda:
+      min: 0.0
+      max: 5.0
+
+    eval_metric: "logloss"
+    n_jobs: -1
+
+
+mlflow:
+  experiment_name: "Telco Churn"
+
+  tracking_uri: "mlruns"
+
+  log_model: true
+  log_processed_data: true
+  log_classification_report: true
