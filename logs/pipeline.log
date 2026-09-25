@@ -77,3 +77,136 @@ Name: count, dtype: int64
 2026-09-24 16:54:53,375 | INFO | ======================================================================
 2026-09-24 16:54:53,375 | INFO | PHASE 2 COMPLETED SUCCESSFULLY
 2026-09-24 16:54:53,375 | INFO | ======================================================================
+2026-09-25 14:29:01,724 | INFO | ======================================================================
+2026-09-25 14:29:01,724 | INFO | TELCO CHURN — OPTUNA + XGBOOST + MLFLOW
+2026-09-25 14:29:01,724 | INFO | ======================================================================
+2026-09-25 14:31:34,849 | INFO | ======================================================================
+2026-09-25 14:31:34,849 | INFO | TELCO CHURN — OPTUNA + XGBOOST + MLFLOW
+2026-09-25 14:31:34,849 | INFO | ======================================================================
+2026-09-25 14:32:43,200 | INFO | ======================================================================
+2026-09-25 14:32:43,200 | INFO | TELCO CHURN — OPTUNA + XGBOOST + MLFLOW
+2026-09-25 14:32:43,200 | INFO | ======================================================================
+2026-09-25 14:33:28,123 | INFO | ======================================================================
+2026-09-25 14:33:28,123 | INFO | TELCO CHURN — OPTUNA + XGBOOST + MLFLOW
+2026-09-25 14:33:28,123 | INFO | ======================================================================
+2026-09-25 14:35:36,036 | INFO | ======================================================================
+2026-09-25 14:35:36,036 | INFO | TELCO CHURN — OPTUNA + XGBOOST + MLFLOW
+2026-09-25 14:35:36,037 | INFO | ======================================================================
+2026-09-25 14:35:37,021 | INFO | [1/8] Loading data...
+2026-09-25 14:35:37,043 | INFO | Raw shape: (7043, 21)
+2026-09-25 14:35:37,044 | INFO | Number of rows: 7043
+2026-09-25 14:35:37,050 | INFO | [2/8] Validating data...
+2026-09-25 14:35:37,058 | ERROR | Data validation FAILED
+2026-09-25 14:35:37,058 | ERROR | Failed checks: ['TotalCharges_non_negative']
+2026-09-25 14:36:58,282 | INFO | ======================================================================
+2026-09-25 14:36:58,282 | INFO | TELCO CHURN — OPTUNA + XGBOOST + MLFLOW
+2026-09-25 14:36:58,282 | INFO | ======================================================================
+2026-09-25 14:36:59,281 | INFO | [1/8] Loading data...
+2026-09-25 14:36:59,304 | INFO | Raw shape: (7043, 21)
+2026-09-25 14:36:59,304 | INFO | Number of rows: 7043
+2026-09-25 14:36:59,311 | INFO | [2/8] Validating data...
+2026-09-25 14:36:59,318 | INFO | Data validation PASSED
+2026-09-25 14:36:59,318 | INFO | [3/8] Preprocessing...
+2026-09-25 14:36:59,429 | INFO | Processed shape: (7043, 20)
+2026-09-25 14:36:59,429 | INFO | Processed data saved to: /home/zahra/Churn_model/data/processed/churn_processed.csv
+2026-09-25 14:36:59,442 | INFO | [4/8] Building features...
+2026-09-25 14:36:59,488 | INFO | Number of features: 30
+2026-09-25 14:36:59,489 | INFO | Features: ['gender', 'SeniorCitizen', 'Partner', 'Dependents', 'tenure', 'PhoneService', 'PaperlessBilling', 'MonthlyCharges', 'TotalCharges', 'MultipleLines_No phone service', 'MultipleLines_Yes', 'InternetService_Fiber optic', 'InternetService_No', 'OnlineSecurity_No internet service', 'OnlineSecurity_Yes', 'OnlineBackup_No internet service', 'OnlineBackup_Yes', 'DeviceProtection_No internet service', 'DeviceProtection_Yes', 'TechSupport_No internet service', 'TechSupport_Yes', 'StreamingTV_No internet service', 'StreamingTV_Yes', 'StreamingMovies_No internet service', 'StreamingMovies_Yes', 'Contract_One year', 'Contract_Two year', 'PaymentMethod_Credit card (automatic)', 'PaymentMethod_Electronic check', 'PaymentMethod_Mailed check']
+2026-09-25 14:36:59,489 | INFO | [5/8] Splitting data...
+2026-09-25 14:36:59,500 | INFO | Train samples: 4225
+2026-09-25 14:36:59,500 | INFO | Validation samples: 1409
+2026-09-25 14:36:59,500 | INFO | Test samples: 1409
+2026-09-25 14:36:59,507 | INFO | Negative samples: 3104
+2026-09-25 14:36:59,507 | INFO | Positive samples: 1121
+2026-09-25 14:36:59,507 | INFO | scale_pos_weight: 2.7690
+2026-09-25 14:36:59,511 | INFO | [6/8] Starting Optuna optimization...
+2026-09-25 14:37:00,786 | INFO | Trial 0 | Recall: 0.8583
+2026-09-25 14:37:01,162 | INFO | Trial 1 | Recall: 0.8610
+2026-09-25 14:37:01,879 | INFO | Trial 2 | Recall: 0.8262
+2026-09-25 14:37:02,519 | INFO | Trial 3 | Recall: 0.8529
+2026-09-25 14:37:03,004 | INFO | Trial 4 | Recall: 0.8316
+2026-09-25 14:37:03,623 | INFO | Trial 5 | Recall: 0.7968
+2026-09-25 14:37:04,125 | INFO | Trial 6 | Recall: 0.8342
+2026-09-25 14:37:04,703 | INFO | Trial 7 | Recall: 0.7914
+2026-09-25 14:37:05,140 | INFO | Trial 8 | Recall: 0.8503
+2026-09-25 14:37:05,705 | INFO | Trial 9 | Recall: 0.8021
+2026-09-25 14:37:06,206 | INFO | Trial 10 | Recall: 0.8556
+2026-09-25 14:37:07,252 | INFO | Trial 11 | Recall: 0.8556
+2026-09-25 14:37:07,790 | INFO | Trial 12 | Recall: 0.8663
+2026-09-25 14:37:08,141 | INFO | Trial 13 | Recall: 0.8583
+2026-09-25 14:37:08,432 | INFO | Trial 14 | Recall: 0.8743
+2026-09-25 14:37:08,828 | INFO | Trial 15 | Recall: 0.8636
+2026-09-25 14:37:09,267 | INFO | Trial 16 | Recall: 0.8503
+2026-09-25 14:37:09,498 | INFO | Trial 17 | Recall: 0.8422
+2026-09-25 14:37:09,916 | INFO | Trial 18 | Recall: 0.8342
+2026-09-25 14:37:10,384 | INFO | Trial 19 | Recall: 0.8556
+2026-09-25 14:37:10,878 | INFO | Trial 20 | Recall: 0.8102
+2026-09-25 14:37:11,209 | INFO | Trial 21 | Recall: 0.8610
+2026-09-25 14:37:11,646 | INFO | Trial 22 | Recall: 0.8449
+2026-09-25 14:37:12,067 | INFO | Trial 23 | Recall: 0.8636
+2026-09-25 14:37:12,969 | INFO | Trial 24 | Recall: 0.6979
+2026-09-25 14:37:13,246 | INFO | Trial 25 | Recall: 0.8583
+2026-09-25 14:37:13,634 | INFO | Trial 26 | Recall: 0.8422
+2026-09-25 14:37:14,067 | INFO | Trial 27 | Recall: 0.8503
+2026-09-25 14:37:14,506 | INFO | Trial 28 | Recall: 0.8503
+2026-09-25 14:37:15,085 | INFO | Trial 29 | Recall: 0.8610
+2026-09-25 14:37:15,086 | INFO | Optuna optimization completed.
+2026-09-25 14:37:15,087 | INFO | Best trial: 14
+2026-09-25 14:37:15,087 | INFO | Best validation recall: 0.8743
+2026-09-25 14:37:15,088 | INFO | Best parameters:
+2026-09-25 14:37:15,088 | INFO |     n_estimators: 308
+2026-09-25 14:37:15,088 | INFO |     learning_rate: 0.19550976066428416
+2026-09-25 14:37:15,088 | INFO |     max_depth: 7
+2026-09-25 14:37:15,088 | INFO |     subsample: 0.9893026972982372
+2026-09-25 14:37:15,088 | INFO |     colsample_bytree: 0.8236865057705135
+2026-09-25 14:37:15,088 | INFO |     min_child_weight: 3
+2026-09-25 14:37:15,088 | INFO |     gamma: 4.844427895807364
+2026-09-25 14:37:15,088 | INFO |     reg_alpha: 2.998014062597728
+2026-09-25 14:37:15,088 | INFO |     reg_lambda: 2.84798468934538
+2026-09-25 14:37:15,101 | INFO | [7/8] Training final model...
+2026-09-25 14:37:15,102 | INFO | Final model parameters:
+2026-09-25 14:37:15,102 | INFO |     n_estimators: 308
+2026-09-25 14:37:15,102 | INFO |     learning_rate: 0.19550976066428416
+2026-09-25 14:37:15,102 | INFO |     max_depth: 7
+2026-09-25 14:37:15,102 | INFO |     subsample: 0.9893026972982372
+2026-09-25 14:37:15,102 | INFO |     colsample_bytree: 0.8236865057705135
+2026-09-25 14:37:15,102 | INFO |     min_child_weight: 3
+2026-09-25 14:37:15,102 | INFO |     gamma: 4.844427895807364
+2026-09-25 14:37:15,102 | INFO |     reg_alpha: 2.998014062597728
+2026-09-25 14:37:15,102 | INFO |     reg_lambda: 2.84798468934538
+2026-09-25 14:37:15,102 | INFO |     random_state: 42
+2026-09-25 14:37:15,102 | INFO |     n_jobs: -1
+2026-09-25 14:37:15,102 | INFO |     scale_pos_weight: 2.768956289027654
+2026-09-25 14:37:15,102 | INFO |     eval_metric: logloss
+2026-09-25 14:37:15,379 | INFO | Final model training completed.
+2026-09-25 14:37:15,379 | INFO | [8/8] Evaluating final model on TEST set...
+2026-09-25 14:37:15,427 | INFO | ======================================================================
+2026-09-25 14:37:15,427 | INFO | FINAL TEST RESULTS
+2026-09-25 14:37:15,427 | INFO | ======================================================================
+2026-09-25 14:37:15,427 | INFO | Accuracy : 0.7182
+2026-09-25 14:37:15,427 | INFO | Precision: 0.4825
+2026-09-25 14:37:15,427 | INFO | Recall   : 0.8476
+2026-09-25 14:37:15,427 | INFO | F1       : 0.6149
+2026-09-25 14:37:15,427 | INFO | ROC-AUC  : 0.8462
+2026-09-25 14:37:15,433 | INFO | 
+Classification Report:
+              precision    recall  f1-score   support
+
+           0      0.924     0.671     0.778      1035
+           1      0.482     0.848     0.615       374
+
+    accuracy                          0.718      1409
+   macro avg      0.703     0.760     0.696      1409
+weighted avg      0.807     0.718     0.735      1409
+
+2026-09-25 14:37:15,455 | INFO | Logging final model to MLflow...
+2026-09-25 14:37:19,936 | INFO | ======================================================================
+2026-09-25 14:37:19,936 | INFO | PIPELINE COMPLETED SUCCESSFULLY
+2026-09-25 14:37:19,936 | INFO | ======================================================================
+2026-09-25 14:37:19,936 | INFO | MLflow Run ID: 1aaf2e7b1b4c47a09a48c08ed0b82fd8
+2026-09-25 14:37:19,936 | INFO | Best validation recall: 0.8743
+2026-09-25 14:37:19,937 | INFO | Test Accuracy : 0.7182
+2026-09-25 14:37:19,937 | INFO | Test Precision: 0.4825
+2026-09-25 14:37:19,937 | INFO | Test Recall   : 0.8476
+2026-09-25 14:37:19,937 | INFO | Test F1       : 0.6149
+2026-09-25 14:37:19,937 | INFO | Test ROC-AUC  : 0.8462

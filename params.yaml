@@ -73,7 +73,7 @@ modeling:
 mlflow:
   experiment_name: "Telco Churn"
 
-  tracking_uri: "mlruns"
+  tracking_uri: sqlite:///mlflow.db
 
   log_model: true
   log_processed_data: true
