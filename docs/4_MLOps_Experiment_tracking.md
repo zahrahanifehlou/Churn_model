@@ -1,0 +1,3553 @@
+# MLflow 
+
+> **Goal:** Understand MLflow from beginner to production-level MLOps.
+>
+> MLflow is not just a logging library. It provides tools for **experiment tracking, model packaging, model registry, and model lifecycle management**.
+
+---
+
+# 1. What is MLflow?
+
+## Definition
+
+**MLflow is an open-source platform for managing the machine learning lifecycle.**
+
+It helps ML engineers and data scientists track:
+
+* experiments
+* parameters
+* metrics
+* artifacts
+* models
+* model versions
+* model lineage
+* model lifecycle
+
+The main problem MLflow solves is:
+
+> **How do I know exactly what I trained, how I trained it, how well it performed, and which model should be used later?**
+
+---
+
+## Without MLflow
+
+Imagine training several XGBoost models:
+
+```text
+model1.pkl
+model2.pkl
+model_final.pkl
+model_final_v2.pkl
+best_model.pkl
+best_model_really.pkl
+```
+
+You may not remember:
+
+```text
+Which dataset?
+Which parameters?
+Which code?
+Which preprocessing?
+Which metrics?
+Which model?
+```
+
+---
+
+## With MLflow
+
+MLflow keeps the information together:
+
+```text
+Experiment
+    |
+    +-- Run 1
+    |     +-- parameters
+    |     +-- metrics
+    |     +-- artifacts
+    |     +-- model
+    |
+    +-- Run 2
+    |
+    +-- Run 3
+```
+
+Now you can compare experiments systematically.
+
+---
+
+# 2. MLflow main components
+
+MLflow can be understood through four major areas:
+
+```text
+MLflow
+│
+├── Tracking
+│
+├── Models
+│
+├── Model Registry
+│
+└── Deployment / Serving
+```
+
+## MLflow Tracking
+
+Records experiments:
+
+```text
+parameters
+metrics
+tags
+artifacts
+runs
+experiments
+```
+
+## MLflow Models
+
+Provides a standardized way to package and load ML models.
+
+## Model Registry
+
+Manages model versions and their lifecycle.
+
+## Model Serving
+
+Helps expose models for inference.
+
+---
+
+# 3. What is an Experiment?
+
+An **experiment** is a logical container for related ML runs.
+
+For example:
+
+```text
+Experiment: Telco Churn XGBoost
+```
+
+It may contain:
+
+```text
+Run 1
+Run 2
+Run 3
+Run 4
+...
+```
+
+Another experiment could be:
+
+```text
+Experiment: Telco Churn Neural Network
+```
+
+---
+
+## Example
+
+```python
+import mlflow
+
+mlflow.set_experiment("Telco Churn XGBoost")
+```
+
+If the experiment doesn't exist, MLflow can create it.
+
+---
+
+## Mental model
+
+```text
+Experiment
+│
+├── Run 1
+├── Run 2
+├── Run 3
+└── Run 4
+```
+
+An experiment groups related training runs.
+
+---
+
+# 4. What is a Run?
+
+A **run** represents one execution of an ML workflow.
+
+For example:
+
+```python
+with mlflow.start_run():
+
+    model.fit(X_train, y_train)
+
+    ...
+```
+
+Every time this block executes, MLflow can create a run.
+
+---
+
+## One run can contain
+
+```text
+Run
+│
+├── Parameters
+├── Metrics
+├── Tags
+├── Artifacts
+├── Model
+└── Metadata
+```
+
+For example:
+
+```text
+Run 001
+
+Parameters:
+    learning_rate = 0.05
+    max_depth = 6
+    n_estimators = 300
+
+Metrics:
+    accuracy = 0.87
+    f1 = 0.82
+    roc_auc = 0.91
+
+Artifacts:
+    confusion_matrix.png
+    feature_importance.png
+    model/
+```
+
+---
+
+# 5. What is a Parameter?
+
+A **parameter** is an input or configuration value used during training.
+
+Examples:
+
+```text
+learning_rate
+max_depth
+n_estimators
+batch_size
+epochs
+random_seed
+regularization
+```
+
+Example:
+
+```python
+params = {
+    "learning_rate": 0.05,
+    "max_depth": 6,
+    "n_estimators": 300
+}
+
+mlflow.log_params(params)
+```
+
+---
+
+## Parameters answer
+
+> **"What settings did I use?"**
+
+---
+
+## Important distinction
+
+Parameters are generally values chosen **before or during training**.
+
+For example:
+
+```text
+learning_rate = 0.05
+```
+
+is a parameter.
+
+---
+
+# 6. What is a Metric?
+
+A **metric** measures model performance.
+
+Examples:
+
+```text
+accuracy
+precision
+recall
+F1
+ROC-AUC
+MAE
+MSE
+RMSE
+log loss
+```
+
+Example:
+
+```python
+mlflow.log_metric("accuracy", accuracy)
+mlflow.log_metric("f1", f1)
+```
+
+---
+
+## Metrics answer
+
+> **"How well did the model perform?"**
+
+---
+
+## Example
+
+```text
+Parameters:
+
+learning_rate = 0.05
+max_depth = 6
+
+Metrics:
+
+accuracy = 0.87
+f1 = 0.82
+roc_auc = 0.91
+```
+
+---
+
+# 7. Parameter vs Metric
+
+This distinction is extremely important.
+
+| Parameter           | Metric               |
+| ------------------- | -------------------- |
+| Input/configuration | Output/result        |
+| Controls training   | Measures performance |
+| learning_rate       | accuracy             |
+| max_depth           | F1                   |
+| batch_size          | RMSE                 |
+| epochs              | ROC-AUC              |
+
+Mental model:
+
+```text
+Parameters
+     |
+     v
+Training
+     |
+     v
+Metrics
+```
+
+---
+
+# 8. What is a Tag?
+
+A **tag** is metadata attached to a run.
+
+Example:
+
+```python
+mlflow.set_tag("model_type", "xgboost")
+mlflow.set_tag("dataset_version", "v2")
+mlflow.set_tag("stage", "baseline")
+```
+
+Tags are useful for organizing and searching runs.
+
+Example:
+
+```text
+model_type = xgboost
+dataset_version = v2
+stage = baseline
+```
+
+---
+
+# 9. What is an Artifact?
+
+An **artifact** is a file generated by an ML workflow.
+
+Examples:
+
+```text
+model files
+plots
+images
+reports
+JSON files
+CSV files
+text files
+logs
+```
+
+Example:
+
+```python
+mlflow.log_artifact("confusion_matrix.png")
+```
+
+You can also log a directory:
+
+```python
+mlflow.log_artifacts("reports/")
+```
+
+---
+
+## Example artifacts
+
+```text
+artifacts/
+│
+├── confusion_matrix.png
+├── roc_curve.png
+├── classification_report.json
+├── feature_importance.png
+└── model/
+```
+
+---
+
+# 10. What is MLflow Tracking?
+
+**MLflow Tracking** is the component responsible for recording ML experiments.
+
+It tracks:
+
+```text
+Experiments
+Runs
+Parameters
+Metrics
+Tags
+Artifacts
+Models
+```
+
+---
+
+## Basic workflow
+
+```python
+import mlflow
+
+mlflow.set_experiment("Telco Churn")
+
+with mlflow.start_run():
+
+    mlflow.log_param("learning_rate", 0.05)
+
+    mlflow.log_metric("accuracy", 0.87)
+```
+
+---
+
+# 11. Basic MLflow training example
+
+```python
+import mlflow
+import mlflow.xgboost
+
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, f1_score
+from sklearn.model_selection import train_test_split
+
+import pandas as pd
+
+
+df = pd.read_csv(
+    "data/processed/telco_churn_processed.csv"
+)
+
+X = df.drop(columns=["Churn"])
+y = df["Churn"]
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+
+params = {
+    "n_estimators": 300,
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "random_state": 42
+}
+
+
+mlflow.set_experiment("Telco Churn")
+
+
+with mlflow.start_run():
+
+    model = XGBClassifier(**params)
+
+    model.fit(
+        X_train,
+        y_train
+    )
+
+    predictions = model.predict(X_test)
+
+    accuracy = accuracy_score(
+        y_test,
+        predictions
+    )
+
+    f1 = f1_score(
+        y_test,
+        predictions
+    )
+
+
+    mlflow.log_params(params)
+
+    mlflow.log_metric(
+        "accuracy",
+        accuracy
+    )
+
+    mlflow.log_metric(
+        "f1",
+        f1
+    )
+
+
+    mlflow.xgboost.log_model(
+        model,
+        "model"
+    )
+```
+
+This creates:
+
+```text
+Experiment
+    |
+    +-- Run
+          |
+          +-- parameters
+          +-- metrics
+          +-- model
+```
+
+---
+
+# 12. MLflow UI
+
+After running your training code, start the MLflow UI.
+
+```bash
+mlflow ui
+```
+
+Usually:
+
+```text
+http://127.0.0.1:5000
+```
+
+The UI allows you to inspect:
+
+```text
+Experiments
+Runs
+Parameters
+Metrics
+Artifacts
+Models
+```
+
+---
+
+# 13. Comparing runs
+
+Suppose you train three models.
+
+```text
+Run 1
+learning_rate = 0.1
+max_depth = 3
+F1 = 0.78
+```
+
+```text
+Run 2
+learning_rate = 0.05
+max_depth = 6
+F1 = 0.83
+```
+
+```text
+Run 3
+learning_rate = 0.02
+max_depth = 8
+F1 = 0.85
+```
+
+MLflow allows you to compare the runs.
+
+This is called:
+
+> **Experiment tracking and experiment comparison.**
+
+---
+
+# 14. What is Autologging?
+
+**Autologging** allows MLflow to automatically capture information from supported ML frameworks.
+
+Example:
+
+```python
+import mlflow
+
+mlflow.autolog()
+```
+
+Then:
+
+```python
+model.fit(X_train, y_train)
+```
+
+MLflow can automatically record supported:
+
+```text
+parameters
+metrics
+model
+artifacts
+```
+
+depending on the framework and integration.
+
+---
+
+## Why use autologging?
+
+It reduces boilerplate.
+
+Instead of:
+
+```python
+mlflow.log_param(...)
+mlflow.log_metric(...)
+mlflow.log_model(...)
+```
+
+you can sometimes use:
+
+```python
+mlflow.autolog()
+```
+
+---
+
+## Important
+
+You should still learn manual logging.
+
+Why?
+
+Because production pipelines often need custom information:
+
+```text
+dataset_version
+data_split
+business_metric
+custom evaluation
+Git commit
+pipeline version
+model threshold
+```
+
+---
+
+# 15. What is an MLflow Model?
+
+An **MLflow Model** is a standardized representation of a trained model.
+
+MLflow supports different model flavors.
+
+Examples:
+
+```text
+scikit-learn
+XGBoost
+PyTorch
+TensorFlow
+transformers
+Python function
+```
+
+---
+
+## XGBoost
+
+```python
+mlflow.xgboost.log_model(
+    model,
+    "model"
+)
+```
+
+---
+
+## Scikit-learn
+
+```python
+mlflow.sklearn.log_model(
+    model,
+    "model"
+)
+```
+
+---
+
+## PyTorch
+
+```python
+mlflow.pytorch.log_model(
+    model,
+    "model"
+)
+```
+
+---
+
+# 16. What is a Model Flavor?
+
+A **model flavor** tells MLflow how a model was created and how it should be loaded.
+
+Examples:
+
+```text
+mlflow.xgboost
+mlflow.sklearn
+mlflow.pytorch
+mlflow.tensorflow
+```
+
+For example:
+
+```python
+mlflow.xgboost.log_model(
+    model,
+    "model"
+)
+```
+
+MLflow knows this is an XGBoost model.
+
+---
+
+# 17. Loading an MLflow Model
+
+A logged model can later be loaded.
+
+For example:
+
+```python
+model = mlflow.xgboost.load_model(
+    "runs:/RUN_ID/model"
+)
+```
+
+Then:
+
+```python
+predictions = model.predict(X_test)
+```
+
+---
+
+# 18. What is the Model Registry?
+
+The **Model Registry** is used to manage model versions.
+
+Tracking asks:
+
+> What happened during training?
+
+Registry asks:
+
+> Which model versions do we have and how are they managed?
+
+---
+
+## Example
+
+```text
+fraud_detection_model
+│
+├── Version 1
+├── Version 2
+├── Version 3
+└── Version 4
+```
+
+Each version can be associated with an MLflow run.
+
+---
+
+# 19. Tracking vs Model Registry
+
+| MLflow Tracking       | Model Registry         |
+| --------------------- | ---------------------- |
+| Tracks experiments    | Manages model versions |
+| Parameters            | Version metadata       |
+| Metrics               | Model lifecycle        |
+| Artifacts             | Aliases                |
+| Runs                  | Registered models      |
+| Experiment comparison | Model management       |
+
+---
+
+## Mental model
+
+```text
+Training
+   |
+   v
+MLflow Tracking
+   |
+   v
+Candidate Model
+   |
+   v
+Model Registry
+   |
+   v
+Model Version
+```
+
+---
+
+# 20. Model Versions
+
+Suppose you register:
+
+```text
+fraud_model
+```
+
+You might have:
+
+```text
+fraud_model
+│
+├── v1
+├── v2
+├── v3
+└── v4
+```
+
+Each version represents a specific registered model artifact.
+
+This gives you version history.
+
+---
+
+# 21. Model aliases
+
+Modern MLflow workflows can use aliases to point to model versions.
+
+For example:
+
+```text
+fraud_model@champion
+```
+
+could point to:
+
+```text
+Version 4
+```
+
+Later:
+
+```text
+fraud_model@champion
+```
+
+could point to:
+
+```text
+Version 5
+```
+
+The application doesn't necessarily need to change its model identifier.
+
+This is useful for controlled model promotion.
+
+---
+
+# 22. Model Tags
+
+You can attach metadata to models and versions.
+
+Examples:
+
+```text
+team = fraud-team
+dataset = fraud-v5
+validated = true
+```
+
+Tags help organize and search model versions.
+
+---
+
+# 23. Artifacts vs Models
+
+A model is technically an artifact, but MLflow gives models special structure and APIs.
+
+Example artifact:
+
+```text
+confusion_matrix.png
+```
+
+Example model:
+
+```text
+model/
+├── MLmodel
+├── model file
+├── environment information
+└── metadata
+```
+
+A model can therefore be loaded and served using MLflow's model APIs.
+
+---
+
+# 24. MLflow vs Git
+
+Git primarily tracks **source code and project files**.
+
+MLflow primarily tracks **ML experiments and models**.
+
+| Git                 | MLflow      |
+| ------------------- | ----------- |
+| Source code         | Experiments |
+| Configuration files | Runs        |
+| Tests               | Parameters  |
+| Documentation       | Metrics     |
+| Branches            | Artifacts   |
+| Commits             | Models      |
+
+---
+
+## Together
+
+```text
+Git
+ |
+ | code version
+ v
+Training
+ |
+ v
+MLflow
+ |
+ +-- parameters
+ +-- metrics
+ +-- artifacts
+ +-- model
+```
+
+You should associate the Git commit with the MLflow run.
+
+Example:
+
+```python
+mlflow.set_tag(
+    "git_commit",
+    git_commit_hash
+)
+```
+
+---
+
+# 25. MLflow vs DVC
+
+DVC is primarily concerned with **data and data pipelines**.
+
+MLflow is primarily concerned with **experiments and models**.
+
+| DVC                     | MLflow              |
+| ----------------------- | ------------------- |
+| Dataset versioning      | Experiment tracking |
+| Large data              | Parameters          |
+| Data pipelines          | Metrics             |
+| Data lineage            | Model artifacts     |
+| Dataset reproducibility | Model registry      |
+
+---
+
+## Together
+
+```text
+Git
+ |
+ +----------+
+ |          |
+ v          v
+DVC       MLflow
+ |          |
+data       experiments
+ |          |
+ +----+-----+
+      |
+      v
+   Training
+      |
+      v
+    Model
+```
+
+---
+
+# 26. MLflow + Optuna
+
+Optuna performs hyperparameter optimization.
+
+MLflow tracks the experiments.
+
+They solve different problems.
+
+```text
+Optuna
+    |
+    | generates parameters
+    v
+XGBoost
+    |
+    | trains model
+    v
+metrics
+    |
+    v
+MLflow
+```
+
+---
+
+## Example
+
+```python
+import optuna
+import mlflow
+
+
+def objective(trial):
+
+    params = {
+        "max_depth": trial.suggest_int(
+            "max_depth",
+            3,
+            10
+        ),
+
+        "learning_rate": trial.suggest_float(
+            "learning_rate",
+            0.01,
+            0.3
+        ),
+
+        "n_estimators": trial.suggest_int(
+            "n_estimators",
+            100,
+            500
+        )
+    }
+
+
+    with mlflow.start_run(
+        nested=True
+    ):
+
+        model = XGBClassifier(
+            **params
+        )
+
+        model.fit(
+            X_train,
+            y_train
+        )
+
+        predictions = model.predict(
+            X_valid
+        )
+
+        f1 = f1_score(
+            y_valid,
+            predictions
+        )
+
+
+        mlflow.log_params(params)
+
+        mlflow.log_metric(
+            "f1",
+            f1
+        )
+
+
+    return f1
+```
+
+Then:
+
+```python
+study = optuna.create_study(
+    direction="maximize"
+)
+
+with mlflow.start_run():
+
+    study.optimize(
+        objective,
+        n_trials=50
+    )
+```
+
+Conceptually:
+
+```text
+Parent MLflow Run
+       |
+       +-- Optuna Trial 1
+       |
+       +-- Optuna Trial 2
+       |
+       +-- Optuna Trial 3
+       |
+       ...
+       |
+       +-- Optuna Trial 50
+```
+
+---
+
+# 27. What is nested run tracking?
+
+A **nested run** is a run created inside another MLflow run.
+
+Useful for:
+
+```text
+hyperparameter optimization
+cross-validation
+multiple training stages
+```
+
+Example:
+
+```python
+with mlflow.start_run():
+
+    # parent run
+
+    with mlflow.start_run(
+        nested=True
+    ):
+
+        # child run
+```
+
+For Optuna:
+
+```text
+Experiment
+│
+└── Optimization Run
+      │
+      ├── Trial 1
+      ├── Trial 2
+      ├── Trial 3
+      └── Trial 4
+```
+
+---
+
+# 28. Tracking epoch-level metrics
+
+This is important for neural networks.
+
+Suppose:
+
+```text
+Epoch 1
+train_loss = 0.70
+val_loss = 0.65
+
+Epoch 2
+train_loss = 0.58
+val_loss = 0.55
+
+Epoch 3
+train_loss = 0.49
+val_loss = 0.51
+```
+
+Use:
+
+```python
+for epoch in range(num_epochs):
+
+    train_loss = train_one_epoch()
+
+    val_loss = validate()
+
+    mlflow.log_metric(
+        "train_loss",
+        train_loss,
+        step=epoch
+    )
+
+    mlflow.log_metric(
+        "val_loss",
+        val_loss,
+        step=epoch
+    )
+```
+
+The `step` tells MLflow which epoch the metric belongs to.
+
+---
+
+# 29. MLflow Tracking Server
+
+When working alone, you can run MLflow locally.
+
+Example:
+
+```text
+Laptop
+│
+├── Training script
+├── MLflow
+└── local storage
+```
+
+In a team, you normally want a centralized MLflow Tracking Server.
+
+```text
+Developer A ─┐
+Developer B ─┼──> MLflow Tracking Server
+Developer C ─┘
+```
+
+Everyone sends their runs to the same server.
+
+---
+
+# 30. Local vs Remote MLflow
+
+## Local
+
+```text
+Training
+   |
+   v
+Local MLflow
+   |
+   v
+Local database/files
+```
+
+Good for:
+
+```text
+learning
+experimentation
+individual projects
+```
+
+---
+
+## Remote
+
+```text
+Developer
+    |
+    v
+MLflow Tracking Server
+    |
+    +------> Database
+    |
+    +------> Artifact Storage
+```
+
+Good for:
+
+```text
+teams
+shared infrastructure
+production
+centralized experiment tracking
+```
+
+---
+
+# 31. Backend Store vs Artifact Store
+
+This is one of the most important MLflow architecture concepts.
+
+MLflow has two different categories of storage.
+
+---
+
+## Backend store
+
+Stores MLflow metadata.
+
+Examples:
+
+```text
+experiments
+runs
+parameters
+metrics
+tags
+metadata
+```
+
+Common backend:
+
+```text
+PostgreSQL
+```
+
+For local learning:
+
+```text
+SQLite
+```
+
+---
+
+## Artifact store
+
+Stores files.
+
+Examples:
+
+```text
+models
+plots
+reports
+JSON
+images
+```
+
+Possible artifact stores:
+
+```text
+local filesystem
+Amazon S3
+Azure Blob Storage
+Google Cloud Storage
+```
+
+---
+
+## Architecture
+
+```text
+                MLflow Server
+                     |
+          +----------+----------+
+          |                     |
+          v                     v
+   Backend Store          Artifact Store
+   PostgreSQL                  S3
+       |                         |
+       |                         |
+   parameters                models
+   metrics                   plots
+   runs                      reports
+   tags                      files
+```
+
+---
+
+# 32. Why PostgreSQL?
+
+PostgreSQL is commonly used as the MLflow backend database because it is a robust relational database suitable for multi-user applications.
+
+It provides:
+
+```text
+transactions
+concurrency
+durability
+structured queries
+reliability
+```
+
+For learning:
+
+```text
+SQLite
+```
+
+is often enough.
+
+For a shared production setup:
+
+```text
+PostgreSQL
+```
+
+is a common choice.
+
+---
+
+# 33. Why S3?
+
+Models and artifacts can become large.
+
+For example:
+
+```text
+model.pt
+model.pkl
+model.onnx
+training_report.zip
+```
+
+Object storage such as Amazon S3 is designed for storing large files.
+
+Architecture:
+
+```text
+MLflow
+   |
+   v
+S3
+   |
+   +-- models
+   +-- plots
+   +-- reports
+   +-- artifacts
+```
+
+Other cloud providers have equivalent object storage:
+
+```text
+AWS      → S3
+Azure    → Blob Storage
+GCP      → Cloud Storage
+```
+
+---
+
+# 34. Production MLflow architecture
+
+A common architecture is:
+
+```text
+                 Developers
+                     |
+                     v
+              MLflow Tracking
+                 Server
+                /       \
+               /         \
+              v           v
+        PostgreSQL       S3
+        metadata       artifacts
+              \           /
+               \         /
+                v       v
+               Model Registry
+                     |
+                     v
+                  Serving
+```
+
+---
+
+# 35. How would you deploy MLflow?
+
+A production deployment could look like:
+
+```text
+Docker
+   |
+   v
+MLflow Server
+   |
+   +---- PostgreSQL
+   |
+   +---- S3
+```
+
+You can run MLflow in:
+
+```text
+Docker
+Kubernetes
+AWS
+Azure
+GCP
+VM
+managed infrastructure
+```
+
+The exact deployment depends on your infrastructure.
+
+---
+
+# 36. Example MLflow server
+
+Conceptually:
+
+```bash
+mlflow server \
+    --host 0.0.0.0 \
+    --port 5000 \
+    --backend-store-uri postgresql://... \
+    --artifacts-destination s3://my-mlflow-bucket
+```
+
+The important architecture is:
+
+```text
+MLflow Server
+      |
+      +---- PostgreSQL
+      |
+      +---- S3
+```
+
+---
+
+# 37. Tracking URI
+
+Your training code needs to know where MLflow Tracking lives.
+
+For local MLflow:
+
+```python
+mlflow.set_tracking_uri(
+    "http://127.0.0.1:5000"
+)
+```
+
+For a remote server:
+
+```python
+mlflow.set_tracking_uri(
+    "http://mlflow-server:5000"
+)
+```
+
+Then:
+
+```python
+mlflow.set_experiment(
+    "Telco Churn"
+)
+```
+
+and:
+
+```python
+with mlflow.start_run():
+    ...
+```
+
+---
+
+# 38. How CI/CD integrates with MLflow
+
+A typical ML CI/CD pipeline:
+
+```text
+Git push
+   |
+   v
+CI pipeline
+   |
+   +-- tests
+   +-- lint
+   +-- data validation
+   +-- training
+   |
+   v
+MLflow
+   |
+   +-- metrics
+   +-- artifacts
+   +-- model
+   |
+   v
+Evaluation
+   |
+   v
+Register model
+   |
+   v
+Deployment
+```
+
+---
+
+# 39. Example CI/CD model gate
+
+Suppose your project requires:
+
+```text
+F1 >= 0.80
+```
+
+Your pipeline can evaluate:
+
+```python
+if f1 < 0.80:
+    raise RuntimeError(
+        "Model does not meet quality threshold"
+    )
+```
+
+If the condition fails:
+
+```text
+CI
+ |
+ X
+ |
+No model promotion
+```
+
+If it passes:
+
+```text
+CI
+ |
+ v
+Register model
+```
+
+The threshold itself is a **project requirement**, not something MLflow determines.
+
+---
+
+# 40. How would you reproduce a model?
+
+To reproduce a model, you should know:
+
+```text
+code version
+dataset version
+configuration
+environment
+parameters
+random seed
+training procedure
+```
+
+A strong reproducibility chain is:
+
+```text
+Git commit
+     +
+Dataset version
+     +
+Config
+     +
+Environment
+     +
+Seed
+     +
+MLflow Run
+     |
+     v
+Model
+```
+
+---
+
+# 41. Reproducibility example
+
+Suppose MLflow contains:
+
+```text
+Git commit:
+abc123
+
+Dataset:
+telco-v3
+
+Config:
+config.yaml
+
+Random seed:
+42
+
+XGBoost:
+1.7.6
+
+Python:
+3.10
+
+Parameters:
+max_depth = 6
+learning_rate = 0.05
+
+Metrics:
+F1 = 0.83
+```
+
+You now have enough information to investigate and reproduce the training process much more reliably.
+
+---
+
+# 42. MLflow does not guarantee reproducibility
+
+This is an important interview point.
+
+MLflow records information.
+
+It does not automatically guarantee that two executions produce identical results.
+
+Reproducibility can be affected by:
+
+```text
+randomness
+hardware
+CUDA
+library versions
+data changes
+non-deterministic algorithms
+environment differences
+```
+
+Therefore:
+
+```text
+MLflow
++
+Git
++
+DVC
++
+configuration
++
+environment management
++
+seeds
+```
+
+provides a stronger reproducibility system.
+
+---
+
+# 43. What is model lineage?
+
+**Model lineage** describes the relationship between:
+
+```text
+data
+code
+configuration
+training run
+model
+model version
+deployment
+```
+
+Example:
+
+```text
+Dataset v3
+     |
+     v
+Git commit abc123
+     |
+     v
+config v5
+     |
+     v
+MLflow Run 184
+     |
+     v
+Model
+     |
+     v
+Registry Version 7
+     |
+     v
+Production
+```
+
+This answers:
+
+> Where did this production model come from?
+
+---
+
+# 44. How to implement model lineage
+
+Record identifiers such as:
+
+```text
+dataset_version
+git_commit
+config_version
+run_id
+model_version
+environment_version
+```
+
+Example:
+
+```python
+mlflow.set_tag(
+    "git_commit",
+    git_commit
+)
+
+mlflow.set_tag(
+    "dataset_version",
+    "v3"
+)
+
+mlflow.set_tag(
+    "config_version",
+    "v5"
+)
+```
+
+Then your model has traceable provenance.
+
+---
+
+# 45. Model promotion
+
+Model promotion means moving a validated model into a deployment workflow.
+
+A typical process:
+
+```text
+Training
+   |
+   v
+Experiment
+   |
+   v
+Evaluation
+   |
+   v
+Candidate model
+   |
+   v
+Registry
+   |
+   v
+Validation
+   |
+   v
+Deployment
+```
+
+Modern MLflow workflows can use aliases such as:
+
+```text
+@candidate
+@champion
+```
+
+to identify the version currently associated with a role.
+
+---
+
+# 46. Example promotion workflow
+
+```text
+Version 10
+    |
+    v
+candidate
+    |
+    v
+Automated evaluation
+    |
+    v
+Validation
+    |
+    v
+champion
+```
+
+The exact promotion criteria should be defined by the organization's ML governance and application requirements.
+
+---
+
+# 47. Model rollback
+
+Suppose:
+
+```text
+Version 10 → current champion
+```
+
+After deployment, a problem is detected.
+
+A rollback strategy can point the serving alias back to a previously validated version:
+
+```text
+Before:
+
+@champion → v10
+
+
+After rollback:
+
+@champion → v9
+```
+
+The important idea is:
+
+> **Do not overwrite the old model. Keep model versions immutable and change which version is referenced for serving.**
+
+---
+
+# 48. Why model versioning matters
+
+Without versioning:
+
+```text
+production_model.pkl
+```
+
+might be overwritten.
+
+Then you lose:
+
+```text
+history
+traceability
+rollback capability
+comparison
+```
+
+With versioning:
+
+```text
+v1
+v2
+v3
+v4
+```
+
+you retain the history.
+
+---
+
+# 49. MLflow + Kubernetes
+
+Kubernetes manages containers and infrastructure.
+
+MLflow manages ML experiments and models.
+
+A possible architecture:
+
+```text
+                  MLflow
+                    |
+               Model Registry
+                    |
+                    v
+              Model artifact
+                    |
+                    v
+              Docker image
+                    |
+                    v
+              Kubernetes
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+      Pod 1                 Pod 2
+          |                   |
+          +---------+---------+
+                    |
+                    v
+                 Clients
+```
+
+---
+
+# 50. MLflow is not Kubernetes
+
+Important distinction:
+
+```text
+MLflow
+→ ML lifecycle management
+
+Kubernetes
+→ container orchestration
+```
+
+MLflow does not replace Kubernetes.
+
+Kubernetes does not replace MLflow.
+
+They can work together.
+
+---
+
+# 51. MLflow + FastAPI + Kubernetes
+
+A production architecture might be:
+
+```text
+                    MLflow
+                       |
+                Model Registry
+                       |
+                       v
+                  Model Version
+                       |
+                       v
+                  Docker Image
+                       |
+                       v
+                  Kubernetes
+                       |
+                       v
+                   FastAPI
+                       |
+                       v
+                    Client
+```
+
+---
+
+# 52. How would you secure a shared MLflow server?
+
+A shared MLflow server should not simply be exposed publicly without security controls.
+
+Important areas include:
+
+```text
+authentication
+authorization
+TLS/HTTPS
+network security
+secret management
+IAM
+storage permissions
+database security
+audit logging
+```
+
+---
+
+## Authentication
+
+Determine:
+
+> Who is allowed to access MLflow?
+
+Possible mechanisms depend on your infrastructure.
+
+---
+
+## Authorization
+
+Determine:
+
+> What can each user do?
+
+For example:
+
+```text
+Data Scientist
+→ create experiments
+
+ML Engineer
+→ register models
+
+Production system
+→ read production model
+```
+
+---
+
+## HTTPS
+
+Use TLS when transmitting credentials and sensitive information.
+
+```text
+Client
+  |
+ HTTPS
+  |
+  v
+MLflow Server
+```
+
+---
+
+## Secrets
+
+Never hardcode:
+
+```text
+AWS secret keys
+database passwords
+API tokens
+```
+
+in source code.
+
+Use:
+
+```text
+environment variables
+secret managers
+IAM roles
+```
+
+---
+
+# 53. MLflow security architecture
+
+A stronger production architecture:
+
+```text
+Users
+  |
+  v
+Authentication
+  |
+  v
+MLflow Server
+  |
+  +---- Authorization
+  |
+  +---- PostgreSQL
+  |
+  +---- Object Storage
+```
+
+Network and storage permissions should also be restricted.
+
+---
+
+# 54. MLflow and environments
+
+A model isn't just a model file.
+
+It may depend on:
+
+```text
+Python
+NumPy
+scikit-learn
+XGBoost
+PyTorch
+CUDA
+system libraries
+```
+
+Therefore model reproducibility requires environment information.
+
+Possible solutions include:
+
+```text
+requirements.txt
+conda
+uv
+Poetry
+Docker
+```
+
+MLflow can also record model environment/dependency information depending on how the model is logged.
+
+---
+
+# 55. Model signature
+
+A model signature describes expected inputs and outputs.
+
+Conceptually:
+
+```text
+Input
+    |
+    | feature_1
+    | feature_2
+    | feature_3
+    v
+Model
+    |
+    v
+Output
+```
+
+For production systems, knowing the expected input schema is important.
+
+For example:
+
+```text
+age: integer
+income: float
+tenure: integer
+```
+
+and output:
+
+```text
+churn_probability: float
+```
+
+---
+
+# 56. Why model signatures matter
+
+They help communicate:
+
+```text
+What input does this model expect?
+What output does it produce?
+What is the schema?
+```
+
+This reduces ambiguity between:
+
+```text
+training
+serving
+API
+deployment
+```
+
+---
+
+# 57. Input examples
+
+An input example demonstrates how a model should be called.
+
+Conceptually:
+
+```text
+Input example
+      |
+      v
+Model
+      |
+      v
+Expected output
+```
+
+This can make model usage easier to understand and validate.
+
+---
+
+# 58. MLflow deployment lifecycle
+
+A complete lifecycle can look like:
+
+```text
+                 DEVELOPMENT
+                     |
+                     v
+                  Training
+                     |
+                     v
+              MLflow Tracking
+                     |
+                     v
+                 Evaluation
+                     |
+                     v
+               Model Registry
+                     |
+                     v
+                Validation
+                     |
+                     v
+                 Deployment
+                     |
+                     v
+                Monitoring
+                     |
+                     v
+                  Drift
+                     |
+                     v
+                Retraining
+                     |
+                     +-----------> MLflow
+```
+
+This creates a continuous ML lifecycle.
+
+---
+
+# 59. MLflow and monitoring
+
+MLflow primarily handles the experiment/model lifecycle.
+
+Production monitoring is a separate concern.
+
+You may monitor:
+
+```text
+latency
+throughput
+errors
+data drift
+prediction drift
+model performance
+resource usage
+```
+
+Possible tools include:
+
+```text
+Prometheus
+Grafana
+Evidently
+cloud monitoring
+custom monitoring
+```
+
+The monitoring system can trigger a retraining workflow.
+
+---
+
+# 60. Complete MLOps architecture
+
+A mature ML system can look like:
+
+```text
+                         Git
+                          |
+                          v
+                    Source Code
+                          |
+                          v
+                    CI/CD Pipeline
+                          |
+              +-----------+-----------+
+              |                       |
+              v                       v
+             DVC                  Validation
+              |                       |
+              +-----------+-----------+
+                          |
+                          v
+                       Training
+                          |
+                          v
+                       MLflow
+                          |
+             +------------+-------------+
+             |            |             |
+             v            v             v
+          Metrics      Artifacts      Model
+                                       |
+                                       v
+                                Model Registry
+                                       |
+                                       v
+                                  Deployment
+                                       |
+                                       v
+                                  Monitoring
+                                       |
+                                       v
+                                     Drift
+                                       |
+                                       v
+                                   Retraining
+                                       |
+                                       +-----> MLflow
+```
+
+---
+
+# 61. MLflow with your Telco Churn project
+
+Your current project can follow this structure:
+
+```text
+telco-mlops/
+│
+├── data/
+│   ├── raw/
+│   └── processed/
+│
+├── configs/
+│   └── config.yaml
+│
+├── src/
+│   ├── preprocessing.py
+│   ├── train.py
+│   └── evaluate.py
+│
+├── tests/
+│
+├── notebooks/
+│
+├── models/
+│
+├── reports/
+│
+├── dvc.yaml
+├── params.yaml
+└── requirements.txt
+```
+
+MLflow sits around the training process:
+
+```text
+config
+  |
+  v
+preprocessing
+  |
+  v
+dataset
+  |
+  v
+XGBoost + Optuna
+  |
+  v
+MLflow
+  |
+  +-- params
+  +-- metrics
+  +-- artifacts
+  +-- model
+```
+
+---
+
+# 62. What should you log in your project?
+
+At minimum:
+
+## Parameters
+
+```text
+learning_rate
+max_depth
+n_estimators
+subsample
+colsample_bytree
+random_state
+test_size
+```
+
+## Metrics
+
+```text
+accuracy
+precision
+recall
+F1
+ROC-AUC
+PR-AUC
+```
+
+## Tags
+
+```text
+model_type
+dataset_version
+git_commit
+experiment_type
+```
+
+## Artifacts
+
+```text
+confusion_matrix.png
+roc_curve.png
+feature_importance.png
+classification_report.json
+```
+
+## Model
+
+```text
+XGBoost model
+```
+
+---
+
+# 63. What should NOT be logged blindly?
+
+Avoid putting sensitive information into MLflow.
+
+Do not log:
+
+```text
+passwords
+API keys
+access tokens
+personal data
+medical identifiers
+private credentials
+```
+
+For sensitive datasets, artifact storage and MLflow metadata need appropriate access controls.
+
+---
+
+# 64. MLflow run lifecycle
+
+A simplified lifecycle:
+
+```text
+Start run
+    |
+    v
+Log parameters
+    |
+    v
+Train
+    |
+    v
+Log metrics
+    |
+    v
+Log artifacts
+    |
+    v
+Log model
+    |
+    v
+End run
+```
+
+Code:
+
+```python
+with mlflow.start_run():
+
+    mlflow.log_params(params)
+
+    model.fit(
+        X_train,
+        y_train
+    )
+
+    mlflow.log_metrics(metrics)
+
+    mlflow.xgboost.log_model(
+        model,
+        "model"
+    )
+```
+
+---
+
+# 65. A complete example
+
+```python
+import mlflow
+import mlflow.xgboost
+
+from xgboost import XGBClassifier
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score
+)
+
+
+mlflow.set_experiment(
+    "Telco Churn XGBoost"
+)
+
+
+params = {
+    "n_estimators": 300,
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "random_state": 42
+}
+
+
+with mlflow.start_run():
+
+    # -------------------------
+    # Tags
+    # -------------------------
+
+    mlflow.set_tag(
+        "model_type",
+        "xgboost"
+    )
+
+    mlflow.set_tag(
+        "dataset_version",
+        "v1"
+    )
+
+
+    # -------------------------
+    # Parameters
+    # -------------------------
+
+    mlflow.log_params(params)
+
+
+    # -------------------------
+    # Training
+    # -------------------------
+
+    model = XGBClassifier(
+        **params
+    )
+
+    model.fit(
+        X_train,
+        y_train
+    )
+
+
+    # -------------------------
+    # Prediction
+    # -------------------------
+
+    predictions = model.predict(
+        X_test
+    )
+
+    probabilities = model.predict_proba(
+        X_test
+    )[:, 1]
+
+
+    # -------------------------
+    # Metrics
+    # -------------------------
+
+    metrics = {
+        "accuracy": accuracy_score(
+            y_test,
+            predictions
+        ),
+
+        "precision": precision_score(
+            y_test,
+            predictions
+        ),
+
+        "recall": recall_score(
+            y_test,
+            predictions
+        ),
+
+        "f1": f1_score(
+            y_test,
+            predictions
+        ),
+
+        "roc_auc": roc_auc_score(
+            y_test,
+            probabilities
+        )
+    }
+
+
+    mlflow.log_metrics(
+        metrics
+    )
+
+
+    # -------------------------
+    # Model
+    # -------------------------
+
+    mlflow.xgboost.log_model(
+        model,
+        "model"
+    )
+
+
+    print(metrics)
+```
+
+---
+
+# 66. The complete MLflow mental model
+
+Remember this:
+
+```text
+                       MLFLOW
+                          |
+        +-----------------+------------------+
+        |                 |                  |
+        v                 v                  v
+    Tracking           Models            Registry
+        |                 |                  |
+        |                 |                  |
+    Experiments       Packaging         Versions
+    Runs              Loading           Aliases
+    Params            Serving           Lineage
+    Metrics
+    Artifacts
+```
+
+---
+
+# 67. Interview Question 1 — What is MLflow?
+
+### Answer
+
+MLflow is an open-source platform for managing the machine learning lifecycle. Its major capabilities include experiment tracking, model packaging, model registry, and model deployment/serving.
+
+The Tracking component records parameters, metrics, artifacts, and runs, while the Model Registry manages model versions and lifecycle metadata.
+
+---
+
+# 68. Interview Question 2 — What is an experiment?
+
+### Answer
+
+An experiment is a logical container for related ML runs. For example, all XGBoost experiments for a particular churn prediction problem could belong to one MLflow experiment.
+
+---
+
+# 69. Interview Question 3 — What is a run?
+
+### Answer
+
+A run represents one execution of an ML workflow. It can contain parameters, metrics, tags, artifacts, and a trained model.
+
+---
+
+# 70. Interview Question 4 — What is a parameter?
+
+### Answer
+
+A parameter is an input or configuration value used by the training process, such as learning rate, maximum tree depth, batch size, or number of epochs.
+
+---
+
+# 71. Interview Question 5 — What is a metric?
+
+### Answer
+
+A metric measures the result or performance of a model, such as accuracy, F1, ROC-AUC, RMSE, or MAE.
+
+---
+
+# 72. Interview Question 6 — What is an artifact?
+
+### Answer
+
+An artifact is a file produced by an ML workflow, such as a trained model, confusion matrix, evaluation report, plot, or JSON file.
+
+---
+
+# 73. Interview Question 7 — What is autologging?
+
+### Answer
+
+Autologging allows MLflow to automatically record supported parameters, metrics, models, and artifacts from supported ML frameworks, reducing the amount of manual logging code.
+
+---
+
+# 74. Interview Question 8 — What is MLflow Tracking?
+
+### Answer
+
+MLflow Tracking is the component that records and organizes ML experiments. It stores experiment runs, parameters, metrics, tags, artifacts, and model information so experiments can be compared and reproduced.
+
+---
+
+# 75. Interview Question 9 — What is the Model Registry?
+
+### Answer
+
+The Model Registry is used to manage registered model versions and their metadata. It provides a centralized location for managing model versions, aliases, tags, and lineage.
+
+---
+
+# 76. Interview Question 10 — Tracking vs Registry?
+
+### Answer
+
+Tracking records what happened during model development and experimentation.
+
+The Registry manages model versions after models become candidates for controlled lifecycle management.
+
+```text
+Tracking
+→ What happened?
+
+Registry
+→ Which model versions do we manage?
+```
+
+---
+
+# 77. Interview Question 11 — Parameters vs metrics?
+
+### Answer
+
+Parameters are inputs or configuration values used during training, while metrics are measurements of the resulting model's performance.
+
+Example:
+
+```text
+learning_rate → parameter
+F1            → metric
+```
+
+---
+
+# 78. Interview Question 12 — Artifacts vs models?
+
+### Answer
+
+Artifacts are files generated by an ML workflow. A model is a specialized artifact with MLflow metadata and a model flavor that allows it to be loaded and potentially served using MLflow's model interfaces.
+
+---
+
+# 79. Interview Question 13 — MLflow vs DVC?
+
+### Answer
+
+DVC primarily handles dataset versioning and data pipelines, while MLflow primarily handles experiment tracking, model artifacts, and model lifecycle management.
+
+They are complementary rather than competing tools.
+
+---
+
+# 80. Interview Question 14 — MLflow vs Git?
+
+### Answer
+
+Git tracks source code and project files, while MLflow tracks ML experiments and model information.
+
+A mature ML project commonly uses both.
+
+```text
+Git
+→ code
+
+MLflow
+→ experiments and models
+```
+
+---
+
+# 81. Interview Question 15 — How do you track an Optuna experiment?
+
+### Answer
+
+I would create an MLflow parent run for the optimization and log each Optuna trial as a nested MLflow run. Each trial would record its hyperparameters and evaluation metrics.
+
+```text
+MLflow parent run
+    |
+    +-- Trial 1
+    +-- Trial 2
+    +-- Trial 3
+    +-- ...
+```
+
+---
+
+# 82. Interview Question 16 — How do you track epoch-level metrics?
+
+### Answer
+
+I would log metrics with a `step` corresponding to the epoch.
+
+```python
+mlflow.log_metric(
+    "val_loss",
+    val_loss,
+    step=epoch
+)
+```
+
+This allows MLflow to track the evolution of the metric throughout training.
+
+---
+
+# 83. Interview Question 17 — What is the MLflow Tracking Server?
+
+### Answer
+
+The MLflow Tracking Server is a centralized service that receives experiment data from ML clients and coordinates access to the configured backend and artifact storage.
+
+Instead of each developer storing runs locally, multiple users can send runs to a shared tracking server.
+
+---
+
+# 84. Interview Question 18 — Backend store vs artifact store?
+
+### Answer
+
+The backend store contains MLflow metadata such as experiments, runs, parameters, metrics, and tags.
+
+The artifact store contains files such as trained models, plots, reports, and other artifacts.
+
+Example:
+
+```text
+PostgreSQL
+→ metadata
+
+S3
+→ artifacts
+```
+
+---
+
+# 85. Interview Question 19 — Why PostgreSQL?
+
+### Answer
+
+PostgreSQL provides a robust relational database for storing MLflow metadata and is appropriate for shared, multi-user environments. SQLite is generally more suitable for local development and learning.
+
+---
+
+# 86. Interview Question 20 — Why S3?
+
+### Answer
+
+S3 provides scalable object storage for large ML artifacts such as model files, plots, reports, and other files generated during experiments.
+
+---
+
+# 87. Interview Question 21 — How would you deploy MLflow?
+
+### Answer
+
+A typical production architecture would deploy an MLflow Tracking Server with a relational backend such as PostgreSQL and object storage such as S3 for artifacts.
+
+```text
+MLflow Server
+      |
+      +-- PostgreSQL
+      |
+      +-- S3
+```
+
+The server could run in Docker, Kubernetes, a VM, or cloud infrastructure.
+
+---
+
+# 88. Interview Question 22 — How would you integrate MLflow with CI/CD?
+
+### Answer
+
+The CI/CD pipeline can run tests, validation, training, and evaluation. MLflow records the resulting run, metrics, artifacts, and model. A quality gate can determine whether the model should proceed to registration or deployment.
+
+```text
+Git
+ ↓
+CI
+ ↓
+Tests
+ ↓
+Training
+ ↓
+MLflow
+ ↓
+Evaluation
+ ↓
+Quality Gate
+ ↓
+Registry
+ ↓
+Deployment
+```
+
+---
+
+# 89. Interview Question 23 — How would you reproduce a model?
+
+### Answer
+
+I would identify the dataset version, Git commit, configuration, dependencies, random seed, training parameters, and MLflow run associated with the model.
+
+A reproducible workflow requires more than MLflow alone.
+
+---
+
+# 90. Interview Question 24 — How would you implement model lineage?
+
+### Answer
+
+I would record identifiers connecting the dataset version, source code commit, configuration, training run, model artifact, and registered model version.
+
+For example:
+
+```text
+Dataset v3
+ ↓
+Git abc123
+ ↓
+Config v5
+ ↓
+MLflow Run 184
+ ↓
+Model Version 7
+```
+
+---
+
+# 91. Interview Question 25 — How would you promote a model to production?
+
+### Answer
+
+I would first train and evaluate the model, validate it against predefined quality and operational requirements, register it, and then associate the validated version with the production-serving alias or deployment workflow.
+
+The exact promotion criteria should be defined by the project's requirements.
+
+---
+
+# 92. Interview Question 26 — How would you roll back a model?
+
+### Answer
+
+I would keep previous model versions immutable and move the production-serving reference or alias back to a previously validated version.
+
+For example:
+
+```text
+Before:
+
+@champion → v10
+
+
+After rollback:
+
+@champion → v9
+```
+
+---
+
+# 93. Interview Question 27 — How would you connect MLflow with Kubernetes?
+
+### Answer
+
+MLflow can manage the model lifecycle while Kubernetes manages container orchestration.
+
+A typical architecture is:
+
+```text
+MLflow Registry
+      |
+      v
+Model
+      |
+      v
+Docker
+      |
+      v
+Kubernetes
+      |
+      v
+Model API
+```
+
+---
+
+# 94. Interview Question 28 — How would you secure a shared MLflow server?
+
+### Answer
+
+I would protect the server with authentication and authorization, HTTPS/TLS, network controls, secure secret management, restricted database and object-storage permissions, and appropriate audit logging.
+
+Credentials should never be hardcoded into source code.
+
+---
+
+# 95. The MLOps toolchain
+
+A useful way to remember the ecosystem is:
+
+```text
+Git
+│
+├── source code
+├── configuration
+└── tests
+│
+▼
+DVC
+│
+└── dataset versioning
+│
+▼
+MLflow
+│
+├── experiments
+├── parameters
+├── metrics
+├── artifacts
+├── models
+└── registry
+│
+▼
+Docker
+│
+└── environment
+│
+▼
+CI/CD
+│
+└── automation
+│
+▼
+Kubernetes / Cloud
+│
+└── deployment
+│
+▼
+Monitoring
+│
+├── latency
+├── errors
+├── drift
+└── performance
+```
+
+---
+
+# 96. What you should know for an MLOps interview
+
+You should be able to explain this architecture from memory:
+
+```text
+                    Git
+                     |
+                     v
+                Source Code
+                     |
+                     v
+                    DVC
+                     |
+                     v
+               Dataset Version
+                     |
+                     v
+                 Training
+                     |
+                     v
+                  MLflow
+                     |
+          +----------+----------+
+          |          |          |
+       Params     Metrics    Artifacts
+          |          |          |
+          +----------+----------+
+                     |
+                     v
+                  Model
+                     |
+                     v
+              Model Registry
+                     |
+                     v
+                 Validation
+                     |
+                     v
+                 Deployment
+                     |
+                     v
+                Monitoring
+                     |
+                     v
+                  Retrain
+```
+
+---
+
+# 97. The most important concepts to memorize
+
+Do not memorize every MLflow command.
+
+Understand these relationships:
+
+```text
+Experiment
+    ↓
+Run
+    ↓
+Parameters + Metrics + Artifacts
+    ↓
+Model
+    ↓
+Model Registry
+    ↓
+Model Version
+    ↓
+Deployment
+```
+
+And:
+
+```text
+Git
+→ code
+
+DVC
+→ data
+
+MLflow
+→ experiments + models
+
+Docker
+→ environment
+
+CI/CD
+→ automation
+
+Monitoring
+→ production behavior
+```
+
+---
+
+# 98. MLflow learning roadmap
+
+## Phase 1 — Fundamentals
+
+Learn:
+
+```text
+Experiment
+Run
+Parameter
+Metric
+Tag
+Artifact
+```
+
+Practice:
+
+```python
+mlflow.set_experiment()
+mlflow.start_run()
+mlflow.log_param()
+mlflow.log_metric()
+mlflow.log_artifact()
+```
+
+---
+
+## Phase 2 — Tracking
+
+Learn:
+
+```text
+MLflow UI
+run comparison
+search/filter
+autologging
+manual logging
+```
+
+---
+
+## Phase 3 — Models
+
+Learn:
+
+```text
+model flavors
+log_model()
+load_model()
+model signature
+input example
+dependencies
+```
+
+---
+
+## Phase 4 — Optuna
+
+Learn:
+
+```text
+Optuna
++
+nested MLflow runs
+```
+
+Architecture:
+
+```text
+Optuna
+  |
+  +-- Trial 1 → MLflow
+  +-- Trial 2 → MLflow
+  +-- Trial 3 → MLflow
+```
+
+---
+
+## Phase 5 — Registry
+
+Learn:
+
+```text
+registered model
+model version
+aliases
+tags
+lineage
+```
+
+---
+
+## Phase 6 — Remote MLflow
+
+Learn:
+
+```text
+Tracking Server
+backend store
+artifact store
+PostgreSQL
+S3
+tracking URI
+```
+
+---
+
+## Phase 7 — Production
+
+Learn:
+
+```text
+Docker
+CI/CD
+authentication
+authorization
+TLS
+secrets
+model serving
+Kubernetes
+monitoring
+```
+
+---
+
+# 99. Final mental model
+
+The entire ML lifecycle can be represented as:
+
+```text
+                   DATA
+                     |
+                     v
+                DVC / Storage
+                     |
+                     v
+                  Training
+                     |
+                     v
+                   MLflow
+                     |
+        +------------+-------------+
+        |            |             |
+        v            v             v
+     Params       Metrics      Artifacts
+        |            |             |
+        +------------+-------------+
+                     |
+                     v
+                   Model
+                     |
+                     v
+             Model Registry
+                     |
+              +------+------+
+              |             |
+              v             v
+           Candidate     Champion
+              |             |
+              +------+------+
+                     |
+                     v
+                 Deployment
+                     |
+                     v
+                Production
+                     |
+                     v
+                 Monitoring
+                     |
+                     v
+                   Drift
+                     |
+                     v
+                 Retraining
+                     |
+                     +-------------> MLflow
+```
+
+The key idea is:
+
+> **MLflow gives you visibility and control over the ML experimentation and model lifecycle. It does not replace Git, DVC, CI/CD, deployment infrastructure, or monitoring.**
+
+---
+
+# 100. One-page MLflow cheat sheet
+
+## Core concepts
+
+```text
+Experiment
+→ collection of related runs
+
+Run
+→ one execution of an ML workflow
+
+Parameter
+→ training input/configuration
+
+Metric
+→ model performance measurement
+
+Tag
+→ metadata for organization/search
+
+Artifact
+→ file produced by the workflow
+
+Model
+→ packaged ML model
+
+Registry
+→ centralized model version management
+```
+
+## Core API
+
+```python
+mlflow.set_tracking_uri()
+
+mlflow.set_experiment()
+
+mlflow.start_run()
+
+mlflow.log_param()
+
+mlflow.log_params()
+
+mlflow.log_metric()
+
+mlflow.log_metrics()
+
+mlflow.log_artifact()
+
+mlflow.log_artifacts()
+
+mlflow.set_tag()
+
+mlflow.autolog()
+```
+
+## Model APIs
+
+```python
+mlflow.xgboost.log_model()
+
+mlflow.xgboost.load_model()
+
+mlflow.sklearn.log_model()
+
+mlflow.sklearn.load_model()
+
+mlflow.pytorch.log_model()
+
+mlflow.pytorch.load_model()
+```
+
+## Architecture
+
+```text
+MLflow Client
+      |
+      v
+Tracking Server
+      |
+      +---- Backend Store
+      |       |
+      |       └── PostgreSQL
+      |
+      +---- Artifact Store
+              |
+              └── S3
+```
+
+## MLOps ecosystem
+
+```text
+Git
+→ code
+
+DVC
+→ data
+
+MLflow
+→ experiments + models
+
+Docker
+→ environment
+
+CI/CD
+→ automation
+
+Kubernetes
+→ orchestration
+
+Monitoring
+→ production behavior
+```
+
+## Core interview sentence
+
+> **MLflow is an open-source platform for managing the ML lifecycle, with capabilities for experiment tracking, model packaging, model registry, and model deployment/serving.**
