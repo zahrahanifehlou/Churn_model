@@ -256,7 +256,8 @@ def run_pipeline(
     if tracking_uri.startswith(("http://", "https://", "sqlite:///")):
         mlflow.set_tracking_uri(tracking_uri)
     else:
-        mlflow.set_tracking_uri(str(PROJECT_ROOT / tracking_uri))
+        
+        mlflow.set_tracking_uri(str(PROJECT_ROOT /tracking_uri))
 
     mlflow.set_experiment(
         experiment_name

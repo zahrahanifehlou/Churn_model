@@ -14,8 +14,8 @@ modeling:
   data_path: "data/processed/churn_processed.csv"
   target_col: "Churn"
 
-  test_size: 0.20
-  validation_size: 0.20
+  test_size: 0.30
+  validation_size: 0.30
 
   random_state: 42
   stratify: true
@@ -73,7 +73,7 @@ modeling:
 mlflow:
   experiment_name: "Telco Churn"
 
-  tracking_uri: sqlite:///mlflow.db
+  tracking_uri: "sqlite:///mlflow.db"
 
   log_model: true
   log_processed_data: true
